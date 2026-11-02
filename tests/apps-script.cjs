@@ -78,6 +78,8 @@ function makeEnv({ props = { PIN_Nando: '1234', PIN_Socio: '5678' } } = {}) {
     Session: { getScriptTimeZone: () => 'America/Caracas' },
     UrlFetchApp: { fetch: () => { throw new Error('sin red'); } },
     ScriptApp: { getOAuthToken: () => 'x' },
+    Logger: { log: () => {} },
+    Slides: {},
     DriveApp: { getFileById: (id) => ({ getBlob: () => ({ getBytes: () => Buffer.from('JPEGDATA-' + id), getContentType: () => 'image/jpeg' }) }) },
   };
   vm.createContext(ctx);
@@ -102,6 +104,15 @@ check('catalog: incluye descripción', cat.items[0].descripcion.startsWith('Desc
 check('PIN incorrecto', env.post({ action: 'login', pin: '0000' }).error === 'PIN incorrecto.');
 const login = env.post({ action: 'login', pin: '1234' });
 check('login con PIN_Nando', login.ok && login.user === 'Nando' && login.version === 2);
+const fmt2 = makeEnv({ props: { PIN_Nando: 'Nando=173479', PIN_Valeria: 'Valeria=1903' } });
+check('PIN escrito como "Nando=173479" también funciona', fmt2.post({ action: 'login', pin: '173479' }).user === 'Nando' && fmt2.post({ action: 'login', pin: '1903' }).user === 'Valeria');
+check('Formato PINS = "Nando=1, Valeria=2"', makeEnv({ props: { PINS: 'Nando=111, Valeria=222' } }).post({ action: 'login', pin: '222' }).user === 'Valeria');
+const diag = env.ctx.diagnosticoAura();
+check('diagnosticoAura: detecta el código nuevo y los PIN', diag[0].startsWith('✅') && diag.some((l) => l.includes('PIN configurados para: Nando, Socio')));
+const viejo = makeEnv();
+vm.runInContext('function doPost(e) { return pdfViejo(); } function probarPdf() { Logger.log("viejo"); }', viejo.ctx);
+const diag2 = viejo.ctx.diagnosticoAura();
+check('diagnosticoAura: avisa si otro archivo con código viejo lo pisa', diag2[0].startsWith('❌') && diag2.some((l) => l.includes('OTRO archivo .gs')));
 const noPins = makeEnv({ props: {} }).post({ action: 'login', pin: '1234' });
 check('Sin PIN configurados: mensaje claro', /No hay PIN configurados/.test(noPins.error));
 const adm = env.post({ action: 'admin_catalog', pin: '1234' });

@@ -150,18 +150,23 @@ Por **categoría** (en el orden en que aparecen en tu Sheet), luego **Mujer → 
 El código está en este repositorio: **`apps-script/Codigo.gs`**. Usa las mismas hojas y columnas que ya tienes (Inventario y Ventas) y no borra nada; solo añade la columna **Cantidad** al final de la hoja Ventas.
 
 1. **Guarda una copia del código viejo.** Abre tu Sheet → **Extensiones → Apps Script**. Selecciona todo el código (`Ctrl+A`), cópialo y pégalo en un documento aparte, por si hay que volver atrás.
-2. **Pega el nuevo.** En GitHub abre `apps-script/Codigo.gs`, toca **Copy raw file** (el ícono de copiar), vuelve a Apps Script, borra todo y pega. Guarda con el disquete 💾.
+2. **Pega el nuevo en el MISMO archivo.** En GitHub abre `apps-script/Codigo.gs`, toca **Copy raw file** (el ícono de copiar), vuelve a Apps Script, borra todo el código viejo y pega. Guarda con el disquete 💾.
+   - ⚠️ En la lista de **Archivos** (a la izquierda) debe quedar **un solo archivo `.gs`**. Si hay otro con el código viejo, bórralo (⋮ junto al archivo → **Eliminar**). Si quedan los dos, Google puede seguir usando el viejo.
 3. **Activa Google Slides** (para el PDF vertical): a la izquierda, junto a **Servicios**, toca **+** → busca **Google Slides API** → **Agregar**.
 4. **Tus PIN.** Toca el engranaje ⚙️ **Configuración del proyecto** → abajo, **Propiedades del script** → **Agregar propiedad**:
-   - Propiedad `PIN_Nando`, valor: tu PIN (por ejemplo `1234`).
-   - Propiedad `PIN_Socio` (con el nombre de tu socio), valor: su PIN.
+   - Propiedad `PIN_Nando`, valor: **solo el número**, por ejemplo `173479`.
+   - Propiedad `PIN_Valeria`, valor: **solo su número**, por ejemplo `1903`.
+   - (Si escribiste `Nando=173479` en el valor, también funciona.)
    - El nombre después de `PIN_` es el que aparece en «Hola, …» y en la columna «Vendió».
-5. **Prueba el PDF desde el editor:** arriba elige la función **probarPdf** → **Ejecutar**. La primera vez Google pide permisos: **Revisar permisos → tu cuenta → Configuración avanzada → Ir a … (no seguro) → Permitir**. Es normal: es tu propio script. Al terminar, en **Registro de ejecución** aparece el enlace del PDF; ábrelo y revisa que sea vertical.
-6. **Publica la versión nueva sin cambiar la URL:** **Implementar → Gestionar implementaciones** → lápiz ✏️ → en **Versión** elige **Nueva versión** → **Implementar**.
+5. **Revisa que todo esté bien:** arriba elige la función **diagnosticoAura** → **Ejecutar**. En **Registro de ejecución** todo debe salir con ✅. Si algo sale con ❌, la línea dice cómo arreglarlo.
+6. **Prueba el PDF desde el editor:** elige la función **probarPdfAuraV2** → **Ejecutar**. La primera vez Google pide permisos: **Revisar permisos → tu cuenta → Configuración avanzada → Ir a … (no seguro) → Permitir**. Es normal: es tu propio script. Al terminar, en **Registro de ejecución** aparece el enlace del PDF con `"formato": "A4 vertical"`; ábrelo y revisa que sea vertical.
+7. **Publica la versión nueva sin cambiar la URL:** **Implementar → Gestionar implementaciones** → lápiz ✏️ → en **Versión** elige **Nueva versión** → **Implementar**.
    - Así la URL `/exec` sigue igual y **no hay que tocar `config.js`**.
-7. En la app: **☰ → Actualizar catálogo**. En el menú debe decir **Apps Script v2**.
+8. En la app: **☰ → Actualizar catálogo**. En el menú debe decir **Apps Script v2**.
 
-**Si el paso 5 dice «Google no aceptó el tamaño vertical»:** crea en Google Drive una **Presentación** en blanco → **Archivo → Configurar página → Personalizado → 21 × 29,7 cm → Aplicar**. Copia su ID (la parte larga de la dirección entre `/d/` y `/edit`) y guárdalo como propiedad `PLANTILLA_PDF`. Vuelve a ejecutar **probarPdf**.
+**Si el PDF sigue saliendo horizontal:** el código viejo sigue activo. Ejecuta **diagnosticoAura**: si dice «Hay OTRO archivo .gs con el código viejo», bórralo, guarda y repite los pasos 6 y 7.
+
+**Si el paso 6 dice «Google no aceptó el tamaño vertical»:** crea en Google Drive una **Presentación** en blanco → **Archivo → Configurar página → Personalizado → 21 × 29,7 cm → Aplicar**. Copia su ID (la parte larga de la dirección entre `/d/` y `/edit`) y guárdalo como propiedad `PLANTILLA_PDF`. Vuelve a ejecutar **probarPdf**.
 
 **Si algo sale mal:** pega de nuevo el código viejo que guardaste en el paso 1 y vuelve a hacer el paso 6.
 
