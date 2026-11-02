@@ -1,4 +1,4 @@
-// Comunicación con el Apps Script (o con el catálogo de prueba ?mock=1).
+// Comunicación con el Apps Script (o con el servidor de mentira de ?mock=1).
 import { API_URL } from './config.js';
 
 export const MOCK = new URLSearchParams(location.search).has('mock');
@@ -34,21 +34,43 @@ async function request(url, options = {}, timeoutMs = 25000) {
   } catch {
     throw new ApiError(`Respuesta inesperada del servidor (código ${res.status}). Revisa la URL en config.js.`);
   }
+  return check(data);
+}
+
+function check(data) {
   if (!data || data.ok !== true) {
     throw new ApiError((data && data.error) || 'El servidor devolvió un error desconocido.');
   }
   return data;
 }
 
-/** GET público: catálogo sin costos, solo disponibles. */
-export function getCatalog() {
-  const url = MOCK ? './mock/catalog.json' : `${API_URL}?action=catalog`;
-  return request(url);
+// ── Demo: Apps Script de mentira en el navegador ──────────────
+let fake = null;
+async function mockApi() {
+  // Siempre pedimos el archivo de ejemplo: así la demo se comporta como la red real
+  // (sin conexión → error de red → se usa la copia guardada).
+  const seed = await request('./mock/catalog.json');
+  if (!fake) {
+    try {
+      const { createFakeApi } = await import('./mock/fake-api.js');
+      fake = createFakeApi(seed.items);
+    } catch {
+      throw new ApiError('No hay conexión con el servidor.', { network: true });
+    }
+  }
+  await new Promise((r) => setTimeout(r, 350)); // simula la demora del servidor
+  return fake;
 }
 
-/** POST de administración (se usará en la fase 2).
- *  text/plain evita el "preflight" CORS que Apps Script no soporta. */
-export function post(action, body = {}, timeoutMs = 30000) {
+/** GET público: catálogo sin costos, solo disponibles. */
+export async function getCatalog() {
+  if (MOCK) return check((await mockApi()).handle({ action: 'catalog' }));
+  return request(`${API_URL}?action=catalog`);
+}
+
+/** POST de administración. text/plain evita el "preflight" CORS que Apps Script no soporta. */
+export async function post(action, body = {}, timeoutMs = 30000) {
+  if (MOCK) return check(JSON.parse(JSON.stringify((await mockApi()).handle({ action, ...body }))));
   return request(API_URL, {
     method: 'POST',
     headers: { 'Content-Type': 'text/plain;charset=utf-8' },
