@@ -16,7 +16,7 @@ const shot = async (page, name) => { await page.waitForTimeout(350); await page.
 (async () => {
   const { createFakeApi } = await import('../mock/fake-api.js');
   const seed = JSON.parse(fs.readFileSync(path.join(__dirname, '..', 'mock', 'catalog.json'), 'utf8'));
-  let fake = createFakeApi(seed.items);
+  let fake = createFakeApi(seed.items, { version: 1 });
 
   const server = await start();
   const URL_APP = `http://127.0.0.1:${server.address().port}${BASE}`;
@@ -192,12 +192,13 @@ const shot = async (page, name) => { await page.waitForTimeout(350); await page.
   await page.click('#tabSales');
   await page.waitForSelector('.sale');
   check('Pestaña Ventas marcada', (await page.getAttribute('#tabSales', 'aria-current')) === 'page');
-  check('Ventas pide limit 40', calls('sales').pop().body.limit === 40);
+  check('Ventas pide hasta 500 (para filtrar por periodo)', calls('sales').pop().body.limit === 500);
   const total = (await page.$$('.sale')).length;
   const voids = (await page.$$('.sale.void')).length;
   check('Lista: 6 ventas (2 activas, 4 anuladas)', total === 6 && voids === 4, `${total}/${voids}`);
-  check('Agrupadas por día ("Hoy")', (await page.textContent('.day')) === 'Hoy');
-  check('Resumen "Hoy": $41.00 · 2 unidades', (await page.textContent('.kpi')).includes('$41.00') && (await page.textContent('.kpi')).includes('2 unidades'));
+  check('Agrupadas por día ("Hoy" con su total)', (await page.textContent('.day span')) === 'Hoy' && (await page.textContent('.day')).includes('$41.00'));
+  const kpis = await page.$$eval('.kpi', (k) => k.map((x) => x.textContent));
+  check('Resumen: $41.00 cobrado · 2 unidades', kpis[0].includes('$41.00') && kpis[1].includes('2') && kpis[1].includes('2 ventas'), kpis.join(' | '));
   check('Muestra precio cobrado, quién y nota', (await page.textContent('.sales')).includes('Demo') && (await page.textContent('#content')).includes('$20.50') && (await page.textContent('#content')).includes('Cliente Ana'));
   await shot(page, '17-ventas.png');
   await page.click('[data-void]'); // la más reciente: Mostaza S
@@ -234,7 +235,7 @@ const shot = async (page, name) => { await page.waitForTimeout(350); await page.
   check('Cerrar sesión: catálogo público y olvida el PIN', (await page.$$('.sell-btn')).length === 0 && await page.isHidden('#adminNav') && await page.evaluate(() => !localStorage.getItem('aura.session.v1') && !localStorage.getItem('aura.admin.v1')));
 
   // 15) Bloqueo tras 8 PIN fallidos
-  fake = createFakeApi(seed.items);
+  fake = createFakeApi(seed.items, { version: 1 });
   await page.click('#lockBtn');
   for (let i = 0; i < 8; i++) {
     await page.fill('#pin', '000' + i);
@@ -250,7 +251,7 @@ const shot = async (page, name) => { await page.waitForTimeout(350); await page.
 
   // 16) PIN cambiado: la sesión recordada se cierra con aviso
   await page.evaluate(() => localStorage.setItem('aura.session.v1', JSON.stringify({ user: 'Demo', pin: '4321' })));
-  fake = createFakeApi(seed.items);
+  fake = createFakeApi(seed.items, { version: 1 });
   await page.reload();
   await page.waitForSelector('#lockBtn:not([hidden])');
   await page.waitForSelector('.toast.err');
