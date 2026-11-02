@@ -1,5 +1,5 @@
 // Prueba de las mejoras con el Apps Script v2: venta con cantidad en una fila, filtros de ventas,
-// Números (rentabilidad), detalle de producto e imagen para redes. También compatibilidad con v1.
+// detalle de producto e imagen para redes (Números está oculto). También compatibilidad con v1.
 // Uso: node tests/fase4.cjs [carpeta_capturas]
 const { chromium } = require('playwright');
 const path = require('path');
@@ -96,22 +96,14 @@ const shot = async (page, name) => { await page.waitForTimeout(350); await page.
   await page.click('[data-sf="periodo"][data-value="hoy"]');
   check('Periodo "Hoy"', (await page.$$('.sale')).length === 3);
 
-  // 3) Números
-  await page.click('#tabStats');
-  await page.waitForSelector('.panel');
-  check('Números: pide "stats" con PIN', calls(log, 'stats').length === 1 && calls(log, 'stats')[0].pin === '1234');
-  const tiles = await page.$$eval('.kpi', (k) => k.map((x) => x.textContent.replace(/\s+/g, ' ').trim()));
-  check('Números: 4 indicadores (vendido, ganancia, inventario, por vender)', tiles.length === 4 && /Vendido/.test(tiles[0]) && /Ganancia/.test(tiles[1]) && /margen/.test(tiles[1]), tiles.join(' | '));
-  check('Números: barra de inversión recuperada', await page.isVisible('.meter .bar-fill'));
-  check('Números: "Lo más vendido" incluye las medias (2 uds.)', (await page.textContent('.panel:has-text("Lo más vendido")')).includes('Medias Deportivas Nike Blancas'));
-  check('Números: "Sin vender todavía" con modelos', (await page.$$('.panel:has-text("Sin vender") .rank li')).length > 0);
-  check('Números: nunca se muestran en el catálogo público (pestaña solo admin)', await page.isVisible('#tabStats'));
-  await shot(page, '31-numeros.png');
-  await page.evaluate(() => window.scrollTo(0, 700));
-  await shot(page, '32-numeros-2.png');
+  // 3) Números: oculto por ahora
+  const tabs = await page.$$eval('#adminNav button', (bs) => bs.filter((b) => b.offsetParent !== null).map((b) => b.textContent.trim()));
+  check('Barra: solo Catálogo · Ventas · Compartir PDF (Números oculto)', tabs.join(' · ') === 'Catálogo · Ventas · Compartir PDF', tabs.join(' · '));
+  check('Números oculto: no se piden costos ("stats")', calls(log, 'stats').length === 0);
+  await page.click('#tabCatalog');
+  await shot(page, '31-barra-admin.png');
 
   // 4) Detalle de producto
-  await page.click('#tabCatalog');
   await card(page, 'Lavanda').locator('button.pi').click();
   await page.waitForSelector('#detailSheet[open]');
   check('Detalle: foto grande (w1000)', ((await page.getAttribute('#detailImg img', 'src')) || '').includes('sz=w1000'));
@@ -153,11 +145,6 @@ const shot = async (page, name) => { await page.waitForTimeout(350); await page.
   await page.click('#sellSubmit');
   await page.waitForSelector('.toast >> text=Vendiste 2 ×');
   check('v1: 2 unidades = 2 llamadas "sell" (sin "cantidad")', calls(log, 'sell').length === 2 && calls(log, 'sell').every((b) => b.cantidad === undefined));
-  await page.click('#tabStats');
-  await page.waitForSelector('.state h2');
-  check('v1: Números pide actualizar el Apps Script', (await page.textContent('.state h2')) === 'Actualiza tu Apps Script' && calls(log, 'stats').length === 0);
-  await shot(page, '37-numeros-v1.png');
-  await page.click('#tabCatalog');
   await card(page, 'Lavanda').locator('button.pi').click();
   await page.click('[data-dact="social"]');
   await page.waitForSelector('#socialStatus.err');

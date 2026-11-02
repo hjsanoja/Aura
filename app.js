@@ -2,7 +2,9 @@
 // Catálogo de solo lectura · modo admin (vender por cantidad, deshacer, ventas, agotados) · compartir PDF
 import { getCatalog, post, generatePdf, isConfigured, MOCK } from './api.js';
 
-export const APP_VERSION = '1.4.0';
+export const APP_VERSION = '1.4.1';
+// «Números» (rentabilidad) está oculto mientras se define. Para volver a mostrarlo: true.
+const SHOW_STATS = false;
 const STORE_KEY = MOCK ? 'aura.catalog.mock.v1' : 'aura.catalog.v1';
 const ADMIN_STORE_KEY = MOCK ? 'aura.admin.mock.v1' : 'aura.admin.v1';
 const SESSION_KEY = MOCK ? 'aura.session.mock.v1' : 'aura.session.v1';
@@ -463,6 +465,7 @@ function renderSession() {
   $('#hello').hidden = !a;
   $('#logoutBtn').hidden = !a;
   $('#adminNav').hidden = !a;
+  $('#tabStats').hidden = !SHOW_STATS;
   if (a) $('#hello').textContent = `Hola, ${a.user || 'admin'}`;
   if (!a) setView('catalog');
 }
@@ -710,7 +713,8 @@ function setView(v) {
   window.scrollTo({ top: 0 });
   if (v === 'catalog') renderGrid();
   else if (v === 'sales') loadSales();
-  else loadStats();
+  else if (SHOW_STATS) loadStats();
+  else setView('catalog');
 }
 
 async function loadSales({ force = false } = {}) {

@@ -7,10 +7,10 @@ App (GitHub Pages)  ⇄  Apps Script (dentro de tu Sheet)  ⇄  Google Sheet + D
 ```
 
 - **Costo: $0.** GitHub Pages y Apps Script son gratis.
-- **Tus costos nunca salen al catálogo.** El catálogo público solo recibe nombre, marca, color, talla, precio, descripción y unidades disponibles. Los costos solo se ven en **Números**, con tu PIN.
+- **Tus costos nunca salen al catálogo.** El catálogo público solo recibe nombre, marca, color, talla, precio, descripción y unidades disponibles. Los costos nunca se muestran en la app.
 - **Funciona sin señal.** Guarda la última versión del catálogo y la muestra con el aviso «Sin conexión».
 
-> **Importante:** para el **PDF vertical**, la **venta de varias unidades en una sola fila**, **Números** y las **imágenes para redes**, instala el Apps Script nuevo (sección 9). Mientras no lo hagas, la app sigue funcionando como antes.
+> **Importante:** para el **PDF vertical**, la **venta de varias unidades en una sola fila** y las **imágenes para redes**, instala el Apps Script nuevo (sección 9). Mientras no lo hagas, la app sigue funcionando como antes.
 
 ---
 
@@ -84,7 +84,7 @@ Si la app dice **«Falta conectar tu Sheet»**, la URL no está pegada o está m
 
 Solo para ti y tu socio. Toca el **candado 🔒**, escribe tu PIN y, si es tu teléfono, marca **Recordar en este dispositivo**. Abajo aparece una barra con:
 
-**Catálogo · Ventas · Números · Compartir PDF**
+**Catálogo · Ventas · Compartir PDF**
 
 Si fallas el PIN 8 veces en 10 minutos, el Script bloquea la entrada un rato.
 
@@ -105,11 +105,8 @@ Con el Apps Script nuevo, una venta de 3 unidades es **una sola fila** en la hoj
 - Arriba eliges el **periodo**: **Hoy**, **7 días**, **30 días** o **Todo**, y **quién vendió** (si son varios).
 - Ves lo **cobrado** y las **unidades** del periodo, y la lista agrupada por día con el total de cada día.
 
-### Números (rentabilidad) — necesita el Apps Script nuevo
-- **Vendido**, **Ganancia** y **margen**, **Inventario a costo** y **Ganancia por vender** (si vendes todo lo que queda).
-- **Inversión recuperada**: cuánto de lo invertido ya volvió en ventas.
-- **Ganancia por marca** y **por categoría**, **Lo más vendido** y **Sin vender todavía** (para moverlo: ponlo en historias, haz un combo…).
-- Los costos llevan **+15 %** de ajuste, como tu hoja «Margen Ajustado». Se cambia en el Apps Script (`AJUSTE_COSTO`).
+### Números (rentabilidad) — oculto por ahora
+Está desactivado mientras se define qué debe mostrar. Para volver a activarlo, en `app.js` cambia `const SHOW_STATS = false;` por `true` (y sube `CACHE_VERSION` en `sw.js`).
 
 ### Imagen para redes — necesita el Apps Script nuevo
 1. Abre un producto en grande y toca **Imagen para redes**.
@@ -177,7 +174,7 @@ El código está en este repositorio: **`apps-script/Codigo.gs`**. Usa las misma
 - HTML, CSS y JavaScript sin frameworks, sin `npm` y sin compilar.
 - Rutas relativas (`./`), porque Pages sirve la app en una subcarpeta.
 - **Al cambiar un archivo de la app, sube `CACHE_VERSION` en `sw.js`** (y `APP_VERSION` en `app.js`).
-- La app detecta la versión del Apps Script (`version: 2` en las respuestas). Con v1 vende unidad por unidad y oculta Números e Imagen para redes.
+- La app detecta la versión del Apps Script (`version: 2` en las respuestas). Con v1 vende unidad por unidad y avisa que Imagen para redes necesita el Apps Script nuevo.
 - No hay secretos en el repositorio. Los PIN viven en las Propiedades del script.
 
 | Archivo | Para qué sirve |
@@ -204,6 +201,6 @@ node tests/fase4.cjs
 - `fase1`: catálogo, filtros y uso sin conexión (32).
 - `fase2`: modo admin con el Apps Script anterior (56).
 - `fase3`: Compartir PDF (30).
-- `fase4`: Apps Script nuevo: cantidad en una fila, filtros de ventas, Números, detalle e imagen para redes (31).
+- `fase4`: Apps Script nuevo: cantidad en una fila, filtros de ventas, Números oculto, detalle e imagen para redes (26).
 
 Para verla en tu computador: `node tests/server.cjs` y abre `http://127.0.0.1:8080/aura-catalogo/?mock=1`.
