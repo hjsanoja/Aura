@@ -10,8 +10,10 @@ App (GitHub Pages)  ⇄  Apps Script (dentro de tu Sheet)  ⇄  Google Sheet + D
 - **Tus costos nunca salen del Sheet.** La app solo recibe nombre, marca, color, talla, precio y unidades disponibles.
 - **Funciona sin señal.** Guarda la última versión del catálogo y la muestra con el aviso «Sin conexión».
 
-> **Estado:** Fase 1 (catálogo, instalación y uso sin conexión) y Fase 2 (modo admin: vender, deshacer, ventas, agotados) listas.
-> Falta la fase 3 (compartir PDF).
+> **Estado:** las 3 fases están listas:
+> 1. Catálogo, instalación en el teléfono y uso sin conexión.
+> 2. Modo admin: vender, deshacer, ventas y agotados.
+> 3. Compartir el catálogo en PDF.
 
 ---
 
@@ -127,6 +129,24 @@ Si fallas el PIN 8 veces en 10 minutos, el Script bloquea la entrada un rato y l
 
 ---
 
+## 7. Compartir el catálogo en PDF (para tus clientes)
+
+1. Entra al modo admin y toca **Compartir PDF**.
+2. Espera. Tu Apps Script arma el PDF con las fotos de Drive. **Puede tardar hasta 1 minuto.**
+   - Puedes cerrar la ventana mientras tanto. Cuando esté listo aparece abajo el aviso **«Tu catálogo PDF está listo» → Ver**.
+3. Cuando esté listo verás el nombre del archivo y cuántas páginas, modelos y unidades tiene. Elige:
+   - **Compartir…**: abre el menú del teléfono para mandarlo por WhatsApp, Instagram, correo, etc.
+   - **Abrir PDF**: lo ves antes de mandarlo.
+   - **Descargar**: lo guarda en el teléfono.
+   - **Copiar enlace**: copia el enlace para pegarlo donde quieras.
+4. Si vuelves a tocar **Compartir PDF**, aparece el último PDF sin esperar otra vez. Para uno nuevo, toca **Generar de nuevo**.
+
+Si pasan 90 segundos sin respuesta, la app deja de esperar y te deja **Reintentar**.
+
+En la demo (`?mock=1`), el PDF que se comparte es un ejemplo de 2 páginas.
+
+---
+
 El catálogo se ordena por **categoría** (en el mismo orden en que aparecen en tu Sheet), luego **Mujer → Hombre → Unisex**, luego **marca** y **nombre**.
 
 Los productos que tienen la misma foto, nombre, color y precio se juntan en una sola tarjeta con sus tallas (`S: 1  M: 2`).
@@ -153,6 +173,7 @@ Los productos que tienen la misma foto, nombre, color y precio se juntan en una 
 | `icons/` | Íconos (generados con `tools/make_icons.py`) |
 | `mock/catalog.json` | Datos de ejemplo para `?mock=1` |
 | `mock/fake-api.js` | Apps Script de mentira (demo y pruebas) |
+| `mock/catalogo-demo.pdf` | PDF de ejemplo de la demo (generado con `tools/make_demo_pdf.py`) |
 | `referencia/` | Catálogo PDF original (guía de diseño) |
 | `tests/` | Pruebas automáticas (no afectan la app) |
 
@@ -160,9 +181,11 @@ Los productos que tienen la misma foto, nombre, color y precio se juntan en una 
 ```bash
 node tests/fase1.cjs
 node tests/fase2.cjs
+node tests/fase3.cjs
 ```
 Abren la app en Chromium sin ventana a 390×844 y guardan capturas en `tests/capturas/`:
 - `fase1`: catálogo y uso sin conexión (28 puntos).
 - `fase2`: modo admin contra el Apps Script de mentira (40 puntos), incluidos los errores y `dup:true`.
+- `fase3`: Compartir PDF (30 puntos), incluido el corte a los 90 s con un reloj simulado.
 
 Para verla en tu computador: `node tests/server.cjs` y abre `http://127.0.0.1:8080/aura-catalogo/?mock=1`.
