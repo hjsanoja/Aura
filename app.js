@@ -1,20 +1,31 @@
-// Aura Catálogo — lógica principal (fase 1: catálogo de solo lectura)
-import { getCatalog, isConfigured, MOCK } from './api.js';
+// Aura Catálogo — lógica principal
+// Fase 1: catálogo de solo lectura · Fase 2: modo admin (vender, deshacer, ventas, agotados)
+import { getCatalog, post, isConfigured, MOCK } from './api.js';
 
-export const APP_VERSION = '1.0.0';
+export const APP_VERSION = '1.1.0';
 const STORE_KEY = MOCK ? 'aura.catalog.mock.v1' : 'aura.catalog.v1';
+const ADMIN_STORE_KEY = MOCK ? 'aura.admin.mock.v1' : 'aura.admin.v1';
+const SESSION_KEY = MOCK ? 'aura.session.mock.v1' : 'aura.session.v1';
 const GENDER_ORDER = ['Mujer', 'Hombre', 'Unisex'];
 const SIZE_ORDER = ['XXS', 'XS', 'S', 'M', 'L', 'XL', 'XXL', 'XXXL', '2XL', '3XL', 'U', 'UNICA', 'ÚNICA'];
+const UNDO_MS = 8000;
+const OFFLINE_SELL_MSG = 'Necesitas conexión para registrar ventas';
 
 const $ = (s, el = document) => el.querySelector(s);
 const state = {
-  items: [],          // items crudos (uno por talla)
+  items: [],          // items crudos (uno por talla). En admin incluye agotados.
   cards: [],          // agrupados por producto
   updated: null,      // Date del catálogo
   offline: false,     // mostrando copia guardada
   loading: false,
   q: '',
   filters: { genero: null, categoria: null, marca: null },
+  admin: null,        // { user, pin } con sesión iniciada
+  isAdminData: false, // los items vienen de admin_catalog (tienen stock/vendida/dup)
+  showSoldOut: false,
+  view: 'catalog',    // 'catalog' | 'sales'
+  sales: null,
+  salesLoading: false,
 };
 
 // ── Utilidades ────────────────────────────────────────────────
@@ -24,7 +35,9 @@ const money = (n) => (Number(n) || 0).toFixed(2);
 const storage = {
   get(k) { try { return JSON.parse(localStorage.getItem(k)); } catch { return null; } },
   set(k, v) { try { localStorage.setItem(k, JSON.stringify(v)); } catch { /* sin espacio o modo privado */ } },
+  del(k) { try { localStorage.removeItem(k); } catch { /* nada */ } },
 };
+const imgURL = (fileId) => `https://drive.google.com/thumbnail?id=${encodeURIComponent(fileId)}&sz=w400`;
 
 function timeAgo(date) {
   if (!date || isNaN(date)) return '';
@@ -38,12 +51,24 @@ function timeAgo(date) {
   return d === 1 ? 'hace 1 día' : `hace ${d} días`;
 }
 
+function fmtDate(v) {
+  const d = new Date(v);
+  if (!v || isNaN(d)) return String(v ?? '');
+  return d.toLocaleString('es', { day: 'numeric', month: 'short', hour: '2-digit', minute: '2-digit' });
+}
+
 function sizeRank(t) {
   const u = String(t).toUpperCase().trim();
   const i = SIZE_ORDER.indexOf(u);
   if (i >= 0) return i;
   const n = parseFloat(u);
   return isNaN(n) ? 500 : 100 + n;
+}
+
+function hash(s) {
+  let h = 5381;
+  for (let i = 0; i < s.length; i++) h = ((h << 5) + h + s.charCodeAt(i)) | 0;
+  return 'c' + (h >>> 0).toString(36);
 }
 
 // ── Agrupar tallas en tarjetas ────────────────────────────────
@@ -56,7 +81,7 @@ function groupItems(items) {
     let c = map.get(k);
     if (!c) {
       c = {
-        id: k, fileId: it.fileId, nombre: it.nombre, marca: it.marca, color: it.color,
+        id: hash(k), fileId: it.fileId, nombre: it.nombre, marca: it.marca, color: it.color,
         genero: it.genero, categoria: it.categoria, precio: Number(it.precio) || 0,
         sizes: [], total: 0,
       };
@@ -64,7 +89,7 @@ function groupItems(items) {
       map.set(k, c);
     }
     const disp = Number(it.disponible) || 0;
-    c.sizes.push({ key: it.key, talla: it.talla, disponible: disp });
+    c.sizes.push({ key: it.key, talla: it.talla, disponible: disp, dup: !!it.dup });
     c.total += disp;
     if (it.codigo && !c.search.includes(norm(it.codigo))) c.search += ' ' + norm(it.codigo);
   }
@@ -80,27 +105,46 @@ function groupItems(items) {
   return cards;
 }
 
-// ── Pintar ────────────────────────────────────────────────────
+// ── Pintar catálogo ───────────────────────────────────────────
 function stockTag(total) {
+  if (total <= 0) return '<span class="stk none">Agotado</span>';
   if (total > 3) return `<span class="stk ok">${total} disp.</span>`;
   if (total === 1) return '<span class="stk low">Última unidad</span>';
   return `<span class="stk low">${total} disp.</span>`;
 }
 
-function cardHTML(c) {
+function sizesHTML(c, { all = false } = {}) {
+  const sizes = state.admin && (state.showSoldOut || all) ? c.sizes : c.sizes.filter((s) => s.disponible > 0);
+  if (!state.admin) {
+    return `<div class="psizes">${sizes.map((s) =>
+      `<span class="szd${s.disponible <= 1 ? ' szlow' : ''}" aria-label="Talla ${esc(s.talla)}: ${s.disponible} disponible${s.disponible === 1 ? '' : 's'}">${esc(s.talla)}: ${s.disponible}</span>`).join('')}</div>`;
+  }
+  const canSell = state.isAdminData;
+  const rows = sizes.map((s) => {
+    const out = s.disponible <= 0;
+    const cls = out ? ' out' : s.disponible === 1 ? ' low' : '';
+    const label = s.dup ? 'Revisar' : 'Vender';
+    const disabled = !canSell || s.dup || out;
+    const btn = out && !s.dup ? '' :
+      `<button type="button" class="sell-btn" data-key="${esc(s.key)}" ${disabled ? 'disabled' : ''} aria-label="${esc(label)} talla ${esc(s.talla)} de ${esc(c.nombre)} ${esc(c.color)}">${label}</button>`;
+    return `<li class="sr${cls}"><span class="sr-t">${esc(s.talla)}</span><span class="sr-d">${out ? 'Agotado' : `${s.disponible} disp.`}</span>${btn}</li>` +
+      (s.dup ? '<li class="dup-note" role="note">Código+talla repetido: corrígelo en el Sheet</li>' : '');
+  }).join('');
+  return `<ul class="sell-list">${rows}</ul>`;
+}
+
+function cardHTML(c, opts = {}) {
   const g = norm(c.genero);
   const img = c.fileId
-    ? `<img src="https://drive.google.com/thumbnail?id=${encodeURIComponent(c.fileId)}&amp;sz=w400" alt="${esc(c.nombre)}, color ${esc(c.color)}" loading="lazy" decoding="async" referrerpolicy="no-referrer">`
+    ? `<img src="${esc(imgURL(c.fileId))}" alt="${esc(c.nombre)}, color ${esc(c.color)}" loading="lazy" decoding="async" referrerpolicy="no-referrer">`
     : '';
-  const sizes = c.sizes.map((s) =>
-    `<span class="szd${s.disponible <= 1 ? ' szlow' : ''}" aria-label="Talla ${esc(s.talla)}: ${s.disponible} disponible${s.disponible === 1 ? '' : 's'}">${esc(s.talla)}: ${s.disponible}</span>`).join('');
-  return `<article class="pc">
+  return `<article class="pc${c.total <= 0 ? ' out' : ''}" data-card="${c.id}">
   <div class="pi${c.fileId ? '' : ' noimg'}">${img}${c.genero ? `<span class="gb g-${esc(g)}">${esc(c.genero)}</span>` : ''}</div>
   <div class="pb">
     <div class="pbrand">${esc(c.marca)}</div>
     <h3 class="pname">${esc(c.nombre)}</h3>
     <div class="pmeta">${esc(c.color)}</div>
-    <div class="psizes">${sizes}</div>
+    ${sizesHTML(c, opts)}
     <div class="pfoot"><div class="pp" aria-label="Precio ${money(c.precio)} dólares"><small>$</small>${money(c.precio)}</div>${stockTag(c.total)}</div>
   </div>
 </article>`;
@@ -110,6 +154,7 @@ function visibleCards() {
   const { q, filters: f } = state;
   const terms = norm(q).split(/\s+/).filter(Boolean);
   return state.cards.filter((c) =>
+    (c.total > 0 || (state.admin && state.showSoldOut)) &&
     (!f.genero || c.genero === f.genero) &&
     (!f.categoria || c.categoria === f.categoria) &&
     (!f.marca || c.marca === f.marca) &&
@@ -117,7 +162,7 @@ function visibleCards() {
 }
 
 function renderStats() {
-  const cards = state.cards;
+  const cards = state.cards.filter((c) => c.total > 0);
   $('#stModels').textContent = cards.length;
   $('#stUnits').textContent = cards.reduce((n, c) => n + c.total, 0);
   $('#stBrands').textContent = new Set(cards.map((c) => c.marca).filter(Boolean)).size;
@@ -125,12 +170,13 @@ function renderStats() {
 
 function renderFilters() {
   const uniq = (arr) => [...new Set(arr.filter(Boolean))];
-  const generos = uniq(state.cards.map((c) => c.genero)).sort((a, b) => {
+  const pool = state.cards.filter((c) => c.total > 0 || (state.admin && state.showSoldOut));
+  const generos = uniq(pool.map((c) => c.genero)).sort((a, b) => {
     const ia = GENDER_ORDER.indexOf(a), ib = GENDER_ORDER.indexOf(b);
     return (ia < 0 ? 9 : ia) - (ib < 0 ? 9 : ib);
   });
-  const categorias = uniq(state.cards.map((c) => c.categoria));
-  const marcas = uniq(state.cards.map((c) => c.marca)).sort((a, b) => a.localeCompare(b, 'es'));
+  const categorias = uniq(pool.map((c) => c.categoria));
+  const marcas = uniq(pool.map((c) => c.marca)).sort((a, b) => a.localeCompare(b, 'es'));
   const row = (field, label, values) => {
     if (values.length < 2) return '';
     const cur = state.filters[field];
@@ -141,10 +187,12 @@ function renderFilters() {
 }
 
 function renderGrid() {
+  if (state.view !== 'catalog') return;
   const main = $('#content');
   const cards = visibleCards();
-  $('#count').textContent = state.cards.length ? `${cards.length} ${cards.length === 1 ? 'modelo' : 'modelos'}` : '';
-  if (!state.cards.length) {
+  const anyVisible = state.cards.some((c) => c.total > 0 || (state.admin && state.showSoldOut));
+  $('#count').textContent = anyVisible ? `${cards.length} ${cards.length === 1 ? 'modelo' : 'modelos'}` : '';
+  if (!anyVisible) {
     main.innerHTML = `<div class="state"><h2>Sin productos disponibles</h2><p>Ahora mismo no hay productos con unidades disponibles en el catálogo.</p><div class="state-actions"><button class="btn" type="button" data-act="refresh">Actualizar</button></div></div>`;
     return;
   }
@@ -163,7 +211,7 @@ function renderGrid() {
     const gens = [...new Set(s.cards.map((c) => c.genero).filter(Boolean))].join(' · ');
     return `<section class="section" aria-label="${esc(s.cat)}">
   <h2 class="sh">${esc(s.cat || 'Otros')} <span class="shs">${esc(gens)}${gens ? ' · ' : ''}${n} ${n === 1 ? 'modelo' : 'modelos'}</span></h2>
-  <div class="grid">${s.cards.map(cardHTML).join('')}</div>
+  <div class="grid">${s.cards.map((c) => cardHTML(c)).join('')}</div>
 </section>`;
   }).join('');
 }
@@ -171,8 +219,13 @@ function renderGrid() {
 function renderUpdated() {
   $('#updated').textContent = state.updated ? `Actualizado ${timeAgo(state.updated)}` : '';
   const banner = $('#banner');
-  if (state.offline) {
-    banner.textContent = `Sin conexión · mostrando copia de ${timeAgo(state.savedAt || state.updated)}`;
+  const offlineNow = state.offline || (state.admin && !navigator.onLine);
+  if (offlineNow) {
+    const parts = [];
+    if (state.offline) parts.push(`Sin conexión · mostrando copia de ${timeAgo(state.savedAt || state.updated)}`);
+    else parts.push('Sin conexión');
+    if (state.admin) parts.push(OFFLINE_SELL_MSG);
+    banner.textContent = parts.join(' · ');
     banner.hidden = false;
   } else {
     banner.hidden = true;
@@ -211,8 +264,10 @@ function renderNotConfigured() {
 }
 
 // ── Carga de datos ────────────────────────────────────────────
-function applyData(data, { offline = false, savedAt = null } = {}) {
-  state.items = Array.isArray(data.items) ? data.items.filter((i) => Number(i.disponible) > 0) : [];
+function applyData(data, { offline = false, savedAt = null, admin = false } = {}) {
+  const items = Array.isArray(data.items) ? data.items : [];
+  state.isAdminData = admin;
+  state.items = admin ? items.map((i) => ({ ...i })) : items.filter((i) => Number(i.disponible) > 0);
   state.cards = groupItems(state.items);
   // En la demo la fecha del JSON es fija: usamos la hora en que se descargó.
   state.updated = MOCK ? new Date(savedAt || Date.now()) : new Date(data.updated || savedAt || Date.now());
@@ -225,24 +280,48 @@ function applyData(data, { offline = false, savedAt = null } = {}) {
   renderAll();
 }
 
+function saveAdminCache() {
+  if (!state.isAdminData) return;
+  storage.set(ADMIN_STORE_KEY, { savedAt: new Date().toISOString(), data: { ok: true, updated: state.updated?.toISOString(), items: state.items } });
+}
+
+function setRefreshing(on) {
+  const btn = $('#refreshBtn');
+  btn.classList.toggle('spin', on);
+  btn.disabled = on;
+}
+
 async function load({ user = false } = {}) {
   if (!isConfigured()) { renderNotConfigured(); return; }
   if (state.loading) return;
   state.loading = true;
-  const btn = $('#refreshBtn');
-  btn.classList.add('spin');
-  btn.disabled = true;
-  if (!state.cards.length) renderSkeleton();
+  setRefreshing(true);
+  if (!state.cards.length && state.view === 'catalog') renderSkeleton();
+  const asAdmin = !!state.admin;
   try {
-    const data = await getCatalog();
-    const savedAt = new Date().toISOString();
-    storage.set(STORE_KEY, { savedAt, data });
-    applyData(data);
+    let data;
+    if (asAdmin) {
+      data = await post('admin_catalog', { pin: state.admin.pin });
+      if (data.user && state.admin) { state.admin.user = data.user; renderSession(); }
+    } else {
+      data = await getCatalog();
+    }
+    if (asAdmin !== !!state.admin) return; // la sesión cambió mientras cargaba
+    storage.set(asAdmin ? ADMIN_STORE_KEY : STORE_KEY, { savedAt: new Date().toISOString(), data });
+    applyData(data, { admin: asAdmin });
     if (user) toast('Catálogo actualizado');
   } catch (err) {
-    const saved = storage.get(STORE_KEY);
+    if (asAdmin !== !!state.admin) return;
+    if (asAdmin && !err.network) {
+      // PIN cambiado, bloqueo por intentos, etc.: cerramos la sesión de admin.
+      logout({ silent: true });
+      toast(err.message, { error: true, duration: 7000 });
+      return;
+    }
+    const saved = (asAdmin && storage.get(ADMIN_STORE_KEY)) || storage.get(STORE_KEY);
     if (err.network && saved && saved.data) {
-      applyData(saved.data, { offline: true, savedAt: saved.savedAt });
+      // Sin conexión nunca se puede vender: mostramos la copia con "Vender" deshabilitado.
+      applyData(saved.data, { offline: true, savedAt: saved.savedAt, admin: false });
       if (user) toast('Sin conexión: se muestra la última copia guardada', { error: true });
     } else if (state.cards.length) {
       toast(err.message, { error: true });
@@ -251,8 +330,7 @@ async function load({ user = false } = {}) {
     }
   } finally {
     state.loading = false;
-    btn.classList.remove('spin');
-    btn.disabled = false;
+    setRefreshing(false);
   }
 }
 
@@ -272,6 +350,277 @@ export function toast(msg, { error = false, action = null, duration = 4000 } = {
   $('#toasts').append(el);
   if (duration) setTimeout(() => el.remove(), duration);
   return el;
+}
+
+// ── Hojas (diálogos) ──────────────────────────────────────────
+function openSheet(d) {
+  if (!d.open) d.showModal();
+}
+function closeSheet(d) {
+  if (d.open) d.close();
+}
+function wireSheet(d) {
+  d.addEventListener('click', (e) => {
+    if (e.target === d && !d.dataset.busy) closeSheet(d); // toque fuera
+    if (e.target.closest('[data-close]') && !d.dataset.busy) closeSheet(d);
+  });
+  d.addEventListener('cancel', (e) => { if (d.dataset.busy) e.preventDefault(); });
+}
+function setBusy(d, btn, busy, label) {
+  if (busy) { d.dataset.busy = '1'; btn.dataset.label = btn.textContent; btn.textContent = label; btn.disabled = true; }
+  else { delete d.dataset.busy; btn.textContent = btn.dataset.label || btn.textContent; btn.disabled = false; }
+}
+function showFormError(el, msg) {
+  el.textContent = msg || '';
+  el.hidden = !msg;
+}
+
+function confirmSheet({ title, text, ok }) {
+  const d = $('#confirmSheet');
+  $('#confirmTitle').textContent = title;
+  $('#confirmText').textContent = text;
+  $('#confirmOk').textContent = ok;
+  openSheet(d);
+  return new Promise((resolve) => {
+    const done = (v) => { d.removeEventListener('close', onClose); $('#confirmOk').onclick = null; resolve(v); };
+    const onClose = () => done(false);
+    d.addEventListener('close', onClose);
+    $('#confirmOk').onclick = () => { d.removeEventListener('close', onClose); closeSheet(d); done(true); };
+  });
+}
+
+// ── Sesión de administrador ───────────────────────────────────
+function renderSession() {
+  const a = state.admin;
+  document.body.classList.toggle('admin', !!a);
+  $('#lockBtn').hidden = !!a;
+  $('#hello').hidden = !a;
+  $('#logoutBtn').hidden = !a;
+  $('#adminbar').hidden = !a;
+  if (a) $('#hello').textContent = `Hola, ${a.user || 'admin'}`;
+  if (!a) setView('catalog');
+}
+
+async function login(e) {
+  e.preventDefault();
+  const d = $('#loginSheet');
+  const pin = $('#pin').value.trim();
+  const err = $('#loginError');
+  if (!pin) { showFormError(err, 'Escribe tu PIN.'); $('#pin').focus(); return; }
+  if (!isConfigured()) { showFormError(err, 'Primero conecta tu Sheet en config.js.'); return; }
+  if (!navigator.onLine) { showFormError(err, 'Necesitas conexión para entrar al modo administrador.'); return; }
+  showFormError(err, '');
+  const btn = $('#loginSubmit');
+  setBusy(d, btn, true, 'Entrando…');
+  try {
+    const res = await post('login', { pin });
+    state.admin = { user: res.user, pin };
+    if ($('#remember').checked) storage.set(SESSION_KEY, { user: res.user, pin });
+    else storage.del(SESSION_KEY);
+    setBusy(d, btn, false);
+    closeSheet(d);
+    $('#pin').value = '';
+    renderSession();
+    toast(`Hola, ${res.user}. Ya puedes registrar ventas.`);
+    await load();
+  } catch (ex) {
+    setBusy(d, btn, false);
+    showFormError(err, ex.network ? 'No hay conexión con el servidor. Inténtalo de nuevo.' : ex.message);
+    $('#pin').select();
+  }
+}
+
+function logout({ silent = false } = {}) {
+  state.admin = null;
+  state.sales = null;
+  state.showSoldOut = false;
+  $('#soldOut').checked = false;
+  storage.del(SESSION_KEY);
+  storage.del(ADMIN_STORE_KEY);
+  renderSession();
+  // Volvemos al catálogo público (sin datos de stock/vendidas).
+  const saved = storage.get(STORE_KEY);
+  if (saved && saved.data) applyData(saved.data, { savedAt: saved.savedAt });
+  else { state.items = []; state.cards = []; }
+  load();
+  if (!silent) toast('Sesión cerrada');
+}
+
+// ── Vender ────────────────────────────────────────────────────
+let selling = null; // { item, card }
+
+function findItem(key) {
+  return state.items.find((i) => i.key === key && !i.dup) || state.items.find((i) => i.key === key);
+}
+
+function openSell(key) {
+  if (!state.admin) return;
+  if (!navigator.onLine || !state.isAdminData) { toast(OFFLINE_SELL_MSG, { error: true }); return; }
+  const item = findItem(key);
+  if (!item) return;
+  if (item.dup) { toast('Código+talla repetido: corrígelo en el Sheet', { error: true }); return; }
+  if (Number(item.disponible) <= 0) { toast('Ya no quedan unidades de esta talla.', { error: true }); return; }
+  selling = { key };
+  const img = item.fileId ? `<img src="${esc(imgURL(item.fileId))}" alt="" referrerpolicy="no-referrer">` : '<div class="ph"></div>';
+  $('#sellProduct').innerHTML = `${img}<div><b>${esc(item.nombre)}</b><span>${esc(item.color)} · Talla <strong>${esc(item.talla)}</strong></span><span>${item.disponible} disponible${item.disponible == 1 ? '' : 's'} · Lista: $${money(item.precio)}</span></div>`;
+  $('#sellPrice').value = money(item.precio);
+  $('#sellNote').value = '';
+  showFormError($('#sellError'), '');
+  openSheet($('#sellSheet'));
+}
+
+async function confirmSell(e) {
+  e.preventDefault();
+  const d = $('#sellSheet');
+  if (d.dataset.busy || !selling) return; // evita doble envío
+  const err = $('#sellError');
+  const raw = $('#sellPrice').value.trim().replace(/\s/g, '').replace(',', '.');
+  const precio = Number(raw);
+  if (!raw || !isFinite(precio) || precio < 0) { showFormError(err, 'Escribe un precio válido (por ejemplo 19 o 19.50).'); $('#sellPrice').focus(); return; }
+  if (!navigator.onLine) { showFormError(err, OFFLINE_SELL_MSG + '.'); return; }
+  showFormError(err, '');
+  const btn = $('#sellSubmit');
+  setBusy(d, btn, true, 'Registrando…');
+  const nota = $('#sellNote').value.trim();
+  const { key } = selling;
+  try {
+    const res = await post('sell', { pin: state.admin.pin, key, precio: Math.round(precio * 100) / 100, ...(nota ? { nota } : {}) });
+    setBusy(d, btn, false);
+    closeSheet(d);
+    selling = null;
+    if (res.item) updateItem(res.item);
+    state.sales = null; // la lista de ventas cambió
+    const it = res.item || findItem(key) || {};
+    toast(`Venta registrada: ${it.nombre || ''} · talla ${it.talla || ''}`, {
+      duration: UNDO_MS,
+      action: { label: 'Deshacer', onClick: () => undoSale(res.saleId) },
+    });
+  } catch (ex) {
+    setBusy(d, btn, false);
+    showFormError(err, ex.network ? `${OFFLINE_SELL_MSG}. No se registró la venta.` : ex.message);
+  }
+}
+
+async function undoSale(saleId, { fromList = false } = {}) {
+  if (!saleId || !state.admin) return false;
+  if (!navigator.onLine) { toast(OFFLINE_SELL_MSG, { error: true }); return false; }
+  try {
+    const res = await post('undo', { pin: state.admin.pin, saleId });
+    if (res.item) updateItem(res.item);
+    if (state.sales) {
+      const s = state.sales.find((x) => x.id === saleId);
+      if (s) s.estado = 'Anulada';
+    }
+    if (!fromList && state.view === 'sales') renderSales();
+    toast('Venta anulada. La unidad volvió al stock.');
+    return true;
+  } catch (ex) {
+    toast(ex.network ? `${OFFLINE_SELL_MSG}. No se anuló la venta.` : ex.message, { error: true, duration: 6000 });
+    return false;
+  }
+}
+
+/** Actualiza una talla con el item que devuelve el servidor, sin recargar todo. */
+function updateItem(item) {
+  const i = state.items.findIndex((x) => x.key === item.key && !x.dup);
+  if (i >= 0) state.items[i] = { ...state.items[i], ...item };
+  else state.items.push(item);
+  state.cards = groupItems(state.items);
+  saveAdminCache();
+  renderStats();
+  const card = state.cards.find((c) => c.sizes.some((s) => s.key === item.key));
+  const el = card && document.querySelector(`[data-card="${card.id}"]`);
+  if (el && state.view === 'catalog') {
+    el.outerHTML = cardHTML(card, { all: true });
+  } else {
+    renderGrid();
+  }
+}
+
+// ── Ventas ────────────────────────────────────────────────────
+function setView(v) {
+  state.view = v;
+  $('#tabCatalog').setAttribute('aria-selected', String(v === 'catalog'));
+  $('#tabSales').setAttribute('aria-selected', String(v === 'sales'));
+  const isCat = v === 'catalog';
+  $('.searchbar').hidden = !isCat;
+  $('#filters').hidden = !isCat;
+  $('.meta').hidden = !isCat;
+  $('#soldOutWrap').hidden = !isCat;
+  if (isCat) renderGrid();
+  else loadSales();
+}
+
+async function loadSales({ force = false } = {}) {
+  if (!state.admin) return;
+  if (state.sales && !force) { renderSales(); return; }
+  if (!navigator.onLine) {
+    $('#content').innerHTML = `<div class="state" role="alert"><h2>Sin conexión</h2><p>Necesitas conexión para ver las ventas.</p><div class="state-actions"><button class="btn" type="button" data-act="reload-sales">Reintentar</button></div></div>`;
+    return;
+  }
+  if (state.salesLoading) return;
+  state.salesLoading = true;
+  $('#content').innerHTML = `<div aria-busy="true" aria-label="Cargando ventas"><div class="sk-line sk-title"></div>${'<div class="sk-line" style="height:72px;border-radius:12px;margin-bottom:10px"></div>'.repeat(4)}</div>`;
+  try {
+    const res = await post('sales', { pin: state.admin.pin, limit: 40 });
+    state.sales = Array.isArray(res.sales) ? res.sales : [];
+    if (state.view === 'sales') renderSales();
+  } catch (ex) {
+    if (state.view === 'sales') {
+      $('#content').innerHTML = `<div class="state" role="alert"><h2>No se pudieron cargar las ventas</h2><p>${esc(ex.network ? 'No hay conexión con el servidor.' : ex.message)}</p><div class="state-actions"><button class="btn" type="button" data-act="reload-sales">Reintentar</button></div></div>`;
+    }
+  } finally {
+    state.salesLoading = false;
+  }
+}
+
+const isActive = (s) => norm(s.estado) === 'activa';
+
+function renderSales() {
+  if (state.view !== 'sales') return;
+  const sales = state.sales || [];
+  const active = sales.filter(isActive);
+  const total = active.reduce((n, s) => n + (Number(s.precioCobrado) || 0), 0);
+  const head = `<div class="sales-head"><h2>Últimas ventas</h2>
+  <span class="sales-sum">${active.length} activa${active.length === 1 ? '' : 's'} · <b>$${money(total)}</b> cobrado
+  <button class="refresh" type="button" data-act="reload-sales" aria-label="Actualizar ventas" style="display:inline-grid;vertical-align:middle"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M20 11a8 8 0 1 0-2.3 5.7"/><path d="M20 4v7h-7"/></svg></button></span></div>`;
+  if (!sales.length) {
+    $('#content').innerHTML = head + '<div class="state"><h2>Aún no hay ventas</h2><p>Cuando registres una venta desde el catálogo aparecerá aquí.</p></div>';
+    return;
+  }
+  $('#content').innerHTML = head + `<ul class="sales">${sales.map((s) => {
+    const act = isActive(s);
+    const diff = Number(s.precioCatalogo) !== Number(s.precioCobrado) && s.precioCatalogo !== undefined && s.precioCatalogo !== '';
+    return `<li class="sale${act ? '' : ' void'}">
+  <div class="sale-main">
+    <b>${esc(s.producto)}</b>
+    <span class="l">Talla ${esc(s.talla)}${diff ? ` · lista $${money(s.precioCatalogo)}` : ''}</span>
+    <span class="l">${esc(fmtDate(s.fecha))}${s.vendio ? ` · ${esc(s.vendio)}` : ''}</span>
+    ${s.nota ? `<span class="l n">“${esc(s.nota)}”</span>` : ''}
+  </div>
+  <div class="sale-side">
+    <span class="sale-price">$${money(s.precioCobrado)}</span>
+    <span class="badge">${esc(s.estado || '')}</span>
+    ${act ? `<button type="button" class="void-btn" data-void="${esc(s.id)}">Anular</button>` : ''}
+  </div>
+</li>`;
+  }).join('')}</ul>`;
+}
+
+async function voidSale(id, btn) {
+  const s = (state.sales || []).find((x) => x.id === id);
+  if (!s) return;
+  const ok = await confirmSheet({
+    title: '¿Anular esta venta?',
+    text: `${s.producto} · talla ${s.talla} · $${money(s.precioCobrado)}. La unidad volverá al stock.`,
+    ok: 'Anular venta',
+  });
+  if (!ok) return;
+  btn.disabled = true;
+  btn.textContent = 'Anulando…';
+  const done = await undoSale(id, { fromList: true });
+  if (!done) { btn.disabled = false; btn.textContent = 'Anular'; return; }
+  renderSales();
 }
 
 // ── Service worker y actualizaciones de la app ────────────────
@@ -298,9 +647,11 @@ async function registerSW() {
       if (w.state === 'installed' && navigator.serviceWorker.controller) promptReload(w);
     });
   });
+  // Solo recargamos cuando una versión nueva reemplaza a otra (no en la primera visita).
+  const hadController = !!navigator.serviceWorker.controller;
   let reloaded = false;
   navigator.serviceWorker.addEventListener('controllerchange', () => {
-    if (reloaded) return;
+    if (reloaded || !hadController) return;
     reloaded = true;
     location.reload();
   });
@@ -350,8 +701,13 @@ function bind() {
 
   $('#refreshBtn').addEventListener('click', () => load({ user: true }));
   $('#content').addEventListener('click', (e) => {
+    const sell = e.target.closest('.sell-btn');
+    if (sell && !sell.disabled) { openSell(sell.dataset.key); return; }
+    const v = e.target.closest('[data-void]');
+    if (v && !v.disabled) { voidSale(v.dataset.void, v); return; }
     const act = e.target.closest('[data-act]')?.dataset.act;
     if (act === 'refresh') load({ user: true });
+    if (act === 'reload-sales') loadSales({ force: true });
     if (act === 'clear-filters') {
       state.filters = { genero: null, categoria: null, marca: null };
       state.q = ''; q.value = ''; $('#qClear').hidden = true;
@@ -360,18 +716,21 @@ function bind() {
   });
 
   // Foto que no carga → marcador "AURA". (los errores de <img> no burbujean: usamos captura)
-  $('#content').addEventListener('error', (e) => {
-    if (e.target.tagName === 'IMG') e.target.parentElement.classList.add('noimg');
+  document.addEventListener('error', (e) => {
+    const img = e.target;
+    if (img.tagName !== 'IMG') return;
+    if (img.parentElement.classList.contains('pi')) img.parentElement.classList.add('noimg');
+    else if (img.closest('.sell-product')) img.replaceWith(Object.assign(document.createElement('div'), { className: 'ph' }));
   }, true);
 
   const menu = $('#menu');
-  $('#menuBtn').addEventListener('click', () => menu.showModal());
+  $('#menuBtn').addEventListener('click', () => openSheet(menu));
   menu.addEventListener('click', async (e) => {
     if (e.target === menu) { menu.close(); return; } // toque fuera
     const act = e.target.closest('[data-act]')?.dataset.act;
     if (!act) return;
     menu.close();
-    if (act === 'refresh') load({ user: true });
+    if (act === 'refresh') { state.view === 'sales' ? loadSales({ force: true }) : load({ user: true }); }
     if (act === 'update') checkForUpdate();
     if (act === 'install' && installEvt) {
       installEvt.prompt();
@@ -380,7 +739,35 @@ function bind() {
       $('#installItem').hidden = true;
     }
   });
-  $('#versionNote').textContent = `Aura Catálogo · versión ${APP_VERSION}${MOCK ? ' · modo demo' : ''}`;
+  $('#versionNote').textContent = `Aura Catálogo · versión ${APP_VERSION}${MOCK ? ' · modo demo (PIN 1234)' : ''}`;
+
+  // Admin
+  ['#loginSheet', '#sellSheet', '#confirmSheet'].forEach((s) => wireSheet($(s)));
+  $('#lockBtn').addEventListener('click', () => {
+    showFormError($('#loginError'), '');
+    $('#pin').value = '';
+    openSheet($('#loginSheet'));
+    $('#pin').focus();
+  });
+  $('#loginForm').addEventListener('submit', login);
+  $('#logoutBtn').addEventListener('click', () => logout());
+  $('#sellForm').addEventListener('submit', confirmSell);
+  $('#sellSheet').addEventListener('close', () => { if (!$('#sellSheet').dataset.busy) selling = null; });
+  $('.tabs').addEventListener('click', (e) => {
+    const b = e.target.closest('[data-view]');
+    if (b && b.dataset.view !== state.view) setView(b.dataset.view);
+  });
+  $('.tabs').addEventListener('keydown', (e) => {
+    if (e.key !== 'ArrowLeft' && e.key !== 'ArrowRight') return;
+    const next = state.view === 'catalog' ? 'sales' : 'catalog';
+    setView(next);
+    $(next === 'catalog' ? '#tabCatalog' : '#tabSales').focus();
+  });
+  $('#soldOut').addEventListener('change', (e) => {
+    state.showSoldOut = e.target.checked;
+    renderFilters();
+    renderGrid();
+  });
 
   // Buscador fijo: añade borde cuando se pega arriba
   const sb = $('.searchbar');
@@ -388,7 +775,8 @@ function bind() {
   sb.before(sentinel);
   new IntersectionObserver(([en]) => sb.classList.toggle('stuck', !en.isIntersecting)).observe(sentinel);
 
-  window.addEventListener('online', () => { if (state.offline) load(); });
+  window.addEventListener('online', () => { renderUpdated(); if (state.offline || (state.admin && !state.isAdminData)) load(); });
+  window.addEventListener('offline', renderUpdated);
   document.addEventListener('visibilitychange', () => {
     if (document.visibilityState === 'visible' && state.updated && Date.now() - state.updated > 5 * 60e3) load();
   });
@@ -398,6 +786,12 @@ function bind() {
 // ── Inicio ────────────────────────────────────────────────────
 $('#demoBadge').hidden = !MOCK;
 bind();
+const session = isConfigured() && storage.get(SESSION_KEY);
+if (session && session.pin) {
+  state.admin = { user: session.user, pin: session.pin };
+  $('#remember').checked = true;
+}
+renderSession();
 // Muestra al instante la última copia guardada mientras llega la nueva
 const saved = storage.get(STORE_KEY);
 if (saved && saved.data && isConfigured()) applyData(saved.data, { savedAt: saved.savedAt });

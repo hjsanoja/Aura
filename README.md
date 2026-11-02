@@ -10,8 +10,8 @@ App (GitHub Pages)  ⇄  Apps Script (dentro de tu Sheet)  ⇄  Google Sheet + D
 - **Tus costos nunca salen del Sheet.** La app solo recibe nombre, marca, color, talla, precio y unidades disponibles.
 - **Funciona sin señal.** Guarda la última versión del catálogo y la muestra con el aviso «Sin conexión».
 
-> **Estado:** Fase 1 lista (catálogo, instalación en el teléfono y uso sin conexión).
-> Faltan la fase 2 (modo admin para vender) y la fase 3 (compartir PDF).
+> **Estado:** Fase 1 (catálogo, instalación y uso sin conexión) y Fase 2 (modo admin: vender, deshacer, ventas, agotados) listas.
+> Falta la fase 3 (compartir PDF).
 
 ---
 
@@ -22,6 +22,8 @@ Abre la dirección de tu app y añade `?mock=1` al final. Por ejemplo:
 `https://hjsanoja.github.io/Aura/?mock=1`
 
 Verás el catálogo con productos de ejemplo y la etiqueta **DEMO** arriba a la izquierda.
+
+En la demo también puedes practicar el modo admin con el **PIN `1234`**. Las ventas de la demo son de mentira: no tocan tu Sheet y se borran al recargar la página.
 
 ---
 
@@ -92,6 +94,39 @@ También puedes tocar el botón **⋯** de la app → **Instalar app**, si apare
 | Naranja «Última unidad» | Queda 1 sola unidad |
 | Talla en naranja (`S: 1`) | Queda 1 en esa talla |
 
+---
+
+## 6. Modo admin: registrar ventas
+
+Solo para ti y tu socio. Los PIN viven en tu Apps Script, nunca en GitHub.
+
+### Entrar
+1. Toca el **candado 🔒** arriba a la derecha.
+2. Escribe tu PIN.
+3. Si es tu teléfono, marca **Recordar en este dispositivo** para no escribirlo cada vez.
+4. Toca **Entrar**. Arriba verás **«Hola, (tu nombre)»** y el botón **Salir**.
+
+Si fallas el PIN 8 veces en 10 minutos, el Script bloquea la entrada un rato y la app te muestra el aviso.
+
+### Vender
+1. Busca el producto y toca **Vender** junto a la talla.
+2. Revisa el **precio cobrado**: viene lleno con el precio de lista. Cámbialo si hiciste descuento (sirven `19`, `19.50` o `19,50`).
+3. Si quieres, escribe una **nota** (cliente, forma de pago…).
+4. Toca **Confirmar venta**. La tarjeta se actualiza al momento y tu Sheet suma 1 en `VENDIDA`.
+
+### ¿Te equivocaste?
+- Justo después de vender aparece **Deshacer** durante 8 segundos.
+- Después de eso: pestaña **Ventas** → **Anular** en la venta → **Anular venta**. La unidad vuelve al stock.
+
+### Otras opciones
+- **Ventas:** muestra las últimas 40 ventas con precio cobrado, quién vendió, fecha, nota y estado (Activa / Anulada).
+- **Mostrar agotados:** enseña también lo que ya no tiene unidades, en gris.
+- **«Código+talla repetido»:** dos filas del Sheet tienen el mismo código y talla. La app no deja vender esa talla hasta que lo corrijas en el Sheet.
+- **Sin conexión:** puedes ver el catálogo, pero no vender. Verás «Necesitas conexión para registrar ventas».
+- **Salir:** cierra la sesión y borra el PIN guardado en ese teléfono.
+
+---
+
 El catálogo se ordena por **categoría** (en el mismo orden en que aparecen en tu Sheet), luego **Mujer → Hombre → Unisex**, luego **marca** y **nombre**.
 
 Los productos que tienen la misma foto, nombre, color y precio se juntan en una sola tarjeta con sus tallas (`S: 1  M: 2`).
@@ -103,7 +138,8 @@ Los productos que tienen la misma foto, nombre, color y precio se juntan en una 
 - HTML, CSS y JavaScript sin frameworks, sin `npm` y sin compilar. Los archivos se suben tal cual.
 - Todas las rutas son relativas (`./`) porque Pages sirve la app en una subcarpeta.
 - **Al cambiar cualquier archivo de la app, sube `CACHE_VERSION` en `sw.js`** (y `APP_VERSION` en `app.js`). Así los teléfonos descargan la versión nueva. `config.js` no lo necesita: siempre se pide primero a internet.
-- No hay secretos en el repositorio. Los PIN se escribirán en pantalla (fase 2).
+- No hay secretos en el repositorio. Los PIN se escriben en pantalla y, si se elige «Recordar», se guardan solo en ese teléfono.
+- Las ventas (POST) nunca se guardan ni se ponen en cola sin conexión.
 
 | Archivo | Para qué sirve |
 |---|---|
@@ -116,13 +152,17 @@ Los productos que tienen la misma foto, nombre, color y precio se juntan en una 
 | `manifest.webmanifest` | Nombre, ícono y colores al instalar |
 | `icons/` | Íconos (generados con `tools/make_icons.py`) |
 | `mock/catalog.json` | Datos de ejemplo para `?mock=1` |
+| `mock/fake-api.js` | Apps Script de mentira (demo y pruebas) |
 | `referencia/` | Catálogo PDF original (guía de diseño) |
 | `tests/` | Pruebas automáticas (no afectan la app) |
 
 ### Pruebas
 ```bash
 node tests/fase1.cjs
+node tests/fase2.cjs
 ```
-Abre la app en Chromium sin ventana a 390×844, revisa 28 puntos y guarda capturas en `tests/capturas/`.
+Abren la app en Chromium sin ventana a 390×844 y guardan capturas en `tests/capturas/`:
+- `fase1`: catálogo y uso sin conexión (28 puntos).
+- `fase2`: modo admin contra el Apps Script de mentira (40 puntos), incluidos los errores y `dup:true`.
 
 Para verla en tu computador: `node tests/server.cjs` y abre `http://127.0.0.1:8080/aura-catalogo/?mock=1`.

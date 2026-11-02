@@ -29,6 +29,11 @@
 <header class="hero">
   <div class="hero-top">
     <span class="demo-badge" id="demoBadge" hidden>Demo</span>
+    <span class="hello" id="hello" hidden></span>
+    <button class="pill-btn" id="logoutBtn" type="button" hidden>Salir</button>
+    <button class="icon-btn" id="lockBtn" type="button" aria-label="Entrar al modo administrador" aria-haspopup="dialog">
+      <svg viewBox="0 0 24 24" aria-hidden="true" class="stroke"><rect x="5" y="11" width="14" height="10" rx="2"/><path d="M8 11V8a4 4 0 0 1 8 0v3"/></svg>
+    </button>
     <button class="icon-btn" id="menuBtn" type="button" aria-label="Menú" aria-haspopup="dialog">
       <svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="5" cy="12" r="2"/><circle cx="12" cy="12" r="2"/><circle cx="19" cy="12" r="2"/></svg>
     </button>
@@ -44,6 +49,18 @@
 </header>
 
 <div class="banner" id="banner" role="status" hidden></div>
+
+<div class="adminbar" id="adminbar" hidden>
+  <div class="tabs" role="tablist" aria-label="Secciones de administración">
+    <button type="button" role="tab" id="tabCatalog" data-view="catalog" aria-selected="true" aria-controls="content">Catálogo</button>
+    <button type="button" role="tab" id="tabSales" data-view="sales" aria-selected="false" aria-controls="content">Ventas</button>
+  </div>
+  <label class="switch" id="soldOutWrap">
+    <input type="checkbox" id="soldOut" role="switch">
+    <span class="track" aria-hidden="true"></span>
+    <span>Mostrar agotados</span>
+  </label>
+</div>
 
 <div class="searchbar">
   <label class="search">
@@ -78,6 +95,49 @@
   <button class="sheet-item" type="button" data-act="install" id="installItem" hidden>Instalar app</button>
   <p class="sheet-note" id="versionNote"></p>
   <button class="btn btn-ghost" type="button" data-act="close">Cerrar</button>
+</dialog>
+
+<dialog class="sheet" id="loginSheet" aria-labelledby="loginTitle">
+  <form id="loginForm" method="dialog" novalidate>
+    <div class="sheet-grip" aria-hidden="true"></div>
+    <h2 id="loginTitle" class="sheet-title">Modo administrador</h2>
+    <p class="sheet-sub">Escribe tu PIN para registrar ventas.</p>
+    <label class="field">
+      <span>PIN</span>
+      <input id="pin" type="password" inputmode="numeric" autocomplete="off" maxlength="32" required>
+    </label>
+    <label class="check"><input type="checkbox" id="remember"> <span>Recordar en este dispositivo</span></label>
+    <p class="form-error" id="loginError" role="alert" hidden></p>
+    <button class="btn" type="submit" id="loginSubmit">Entrar</button>
+    <button class="btn btn-ghost" type="button" data-close>Cancelar</button>
+  </form>
+</dialog>
+
+<dialog class="sheet" id="sellSheet" aria-labelledby="sellTitle">
+  <form id="sellForm" method="dialog" novalidate>
+    <div class="sheet-grip" aria-hidden="true"></div>
+    <h2 id="sellTitle" class="sheet-title">Registrar venta</h2>
+    <div class="sell-product" id="sellProduct"></div>
+    <label class="field">
+      <span>Precio cobrado ($)</span>
+      <input id="sellPrice" type="text" inputmode="decimal" autocomplete="off" required>
+    </label>
+    <label class="field">
+      <span>Nota <small>(opcional)</small></span>
+      <input id="sellNote" type="text" maxlength="200" autocomplete="off" placeholder="Ej.: cliente, descuento, forma de pago">
+    </label>
+    <p class="form-error" id="sellError" role="alert" hidden></p>
+    <button class="btn" type="submit" id="sellSubmit">Confirmar venta</button>
+    <button class="btn btn-ghost" type="button" data-close>Cancelar</button>
+  </form>
+</dialog>
+
+<dialog class="sheet" id="confirmSheet" aria-labelledby="confirmTitle">
+  <div class="sheet-grip" aria-hidden="true"></div>
+  <h2 id="confirmTitle" class="sheet-title"></h2>
+  <p class="sheet-sub" id="confirmText"></p>
+  <button class="btn btn-danger" type="button" id="confirmOk"></button>
+  <button class="btn btn-ghost" type="button" data-close>Cancelar</button>
 </dialog>
 
 <div class="toasts" id="toasts" aria-live="polite"></div>

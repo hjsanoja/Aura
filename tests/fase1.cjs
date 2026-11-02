@@ -29,17 +29,20 @@ const check = (name, ok, extra = '') => { results.push({ name, ok }); console.lo
   let ctx = await browser.newContext(ctxOpts);
   let page = await ctx.newPage();
   watch(page);
+  // Simula un config.js sin URL (como recién descargado)
+  await page.route(/\/config\.js$/, (r) => r.fulfill({ contentType: 'text/javascript', body: 'export const API_URL = "PEGAR_AQUI_URL_DE_APPS_SCRIPT";' }));
   await page.goto(URL_APP);
   await page.waitForSelector('.state h2');
-  check('Sin URL configurada muestra instrucciones', (await page.textContent('.state h2')).includes('Falta conectar'));
+  await page.unroute(/\/config\.js$/);
+  check('Sin URL configurada muestra instrucciones', (await page.textContent('.state h2')).includes('Falta conectar'), await page.textContent('.state h2'));
   await page.screenshot({ path: path.join(OUT, '1-sin-configurar.png') });
 
   // 2) Demo ?mock=1
   await page.goto(URL_APP + '?mock=1');
   await page.waitForSelector('.pc:not(.sk)');
   const stats = await page.$$eval('.stats dd', (d) => d.map((x) => x.textContent));
-  check('Cabecera: 15 modelos · 32 unidades · 5 marcas', stats.join('/') === '15/32/5', stats.join('/'));
-  check('15 tarjetas', (await page.$$('.pc')).length === 15);
+  check('Cabecera: 17 modelos · 35 unidades · 5 marcas', stats.join('/') === '17/35/5', stats.join('/'));
+  check('17 tarjetas', (await page.$$('.pc')).length === 17);
   const mostaza = await page.locator('.pc', { hasText: 'Alo Yoga Mostaza' }).locator('.szd').allTextContents();
   check('Agrupa tallas en una tarjeta (S:1 M:2)', mostaza.join(' ') === 'S: 1 M: 2', mostaza.join(' '));
   const sections = await page.$$eval('.sh', (h) => h.map((x) => x.firstChild.textContent.trim()));
@@ -69,7 +72,7 @@ const check = (name, ok, extra = '') => { results.push({ name, ok }); console.lo
   await page.waitForTimeout(300);
   check('Estado vacío con "Limpiar filtros"', await page.isVisible('text=Limpiar filtros'));
   await page.click('text=Limpiar filtros');
-  check('Limpiar filtros restaura 15', (await page.textContent('#count')) === '15 modelos');
+  check('Limpiar filtros restaura 17', (await page.textContent('#count')) === '17 modelos');
 
   // 4) Service worker y manifest
   await page.evaluate(() => navigator.serviceWorker.ready);
@@ -109,7 +112,7 @@ const check = (name, ok, extra = '') => { results.push({ name, ok }); console.lo
   await page.waitForSelector('.pc:not(.sk)');
   await page.waitForSelector('#banner:not([hidden])');
   check('Sin conexión: abre y muestra aviso', (await page.textContent('#banner')).startsWith('Sin conexión · mostrando copia de'), await page.textContent('#banner'));
-  check('Sin conexión: mantiene las 15 tarjetas', (await page.$$('.pc')).length === 15);
+  check('Sin conexión: mantiene las 17 tarjetas', (await page.$$('.pc')).length === 17);
   await page.screenshot({ path: path.join(OUT, '6-sin-conexion.png') });
   await ctx.setOffline(false);
   await ctx.close();
@@ -130,7 +133,7 @@ const check = (name, ok, extra = '') => { results.push({ name, ok }); console.lo
   await page.unroute('**/mock/catalog.json');
   await page.click('text=Reintentar');
   await page.waitForSelector('.pc:not(.sk)');
-  check('Reintentar carga el catálogo', (await page.$$('.pc')).length === 15);
+  check('Reintentar carga el catálogo', (await page.$$('.pc')).length === 17);
 
   // 8) Error del servidor {ok:false}
   await page.route('**/mock/catalog.json', (r) => r.fulfill({ contentType: 'application/json', body: JSON.stringify({ ok: false, error: 'La hoja "Inventario" no existe.' }) }));
