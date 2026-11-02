@@ -30,55 +30,43 @@
   <div class="hero-top">
     <span class="demo-badge" id="demoBadge" hidden>Demo</span>
     <span class="hello" id="hello" hidden></span>
-    <button class="pill-btn" id="logoutBtn" type="button" hidden>Salir</button>
     <button class="icon-btn" id="lockBtn" type="button" aria-label="Entrar al modo administrador" aria-haspopup="dialog">
-      <svg viewBox="0 0 24 24" aria-hidden="true" class="stroke"><rect x="5" y="11" width="14" height="10" rx="2"/><path d="M8 11V8a4 4 0 0 1 8 0v3"/></svg>
+      <svg viewBox="0 0 24 24" aria-hidden="true"><rect x="5" y="11" width="14" height="10" rx="2"/><path d="M8 11V8a4 4 0 0 1 8 0v3"/></svg>
     </button>
     <button class="icon-btn" id="menuBtn" type="button" aria-label="Menú" aria-haspopup="dialog">
-      <svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="5" cy="12" r="2"/><circle cx="12" cy="12" r="2"/><circle cx="19" cy="12" r="2"/></svg>
+      <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M4 7h16M4 12h16M4 17h16"/></svg>
     </button>
   </div>
   <h1 class="logo">AURA</h1>
-  <div class="logo-line" aria-hidden="true"></div>
   <p class="logo-sub">Activewear · Catálogo</p>
   <dl class="stats" aria-label="Resumen del catálogo">
-    <div><dt>Modelos</dt><dd id="stModels">–</dd></div>
-    <div><dt>Unidades</dt><dd id="stUnits">–</dd></div>
-    <div><dt>Marcas</dt><dd id="stBrands">–</dd></div>
+    <div><dd id="stModels">–</dd><dt>Modelos</dt></div>
+    <div><dd id="stUnits">–</dd><dt>Unidades</dt></div>
+    <div><dd id="stBrands">–</dd><dt>Marcas</dt></div>
   </dl>
 </header>
 
 <div class="banner" id="banner" role="status" hidden></div>
 
-<div class="adminbar" id="adminbar" hidden>
-  <div class="tabs" role="tablist" aria-label="Secciones de administración">
-    <button type="button" role="tab" id="tabCatalog" data-view="catalog" aria-selected="true" aria-controls="content">Catálogo</button>
-    <button type="button" role="tab" id="tabSales" data-view="sales" aria-selected="false" aria-controls="content">Ventas</button>
-  </div>
-  <button type="button" class="pdf-btn" id="pdfBtn" aria-haspopup="dialog">
-    <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M14 3H7a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h10a2 2 0 0 0 2-2V8z"/><path d="M14 3v5h5"/><path d="M12 18v-6"/><path d="m9 15 3 3 3-3"/></svg>
-    <span id="pdfBtnText">Compartir PDF</span>
-  </button>
-  <label class="switch" id="soldOutWrap">
-    <input type="checkbox" id="soldOut" role="switch">
-    <span class="track" aria-hidden="true"></span>
-    <span>Mostrar agotados</span>
-  </label>
-</div>
-
 <div class="searchbar">
-  <label class="search">
-    <svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="11" cy="11" r="7"/><path d="m20 20-3.5-3.5"/></svg>
-    <span class="sr-only">Buscar</span>
-    <input id="q" type="search" placeholder="Buscar producto, marca o color" autocomplete="off" enterkeyhint="search">
-    <button class="clear" id="qClear" type="button" aria-label="Borrar búsqueda" hidden>×</button>
-  </label>
+  <div class="searchrow">
+    <label class="search">
+      <svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="11" cy="11" r="7"/><path d="m20 20-3.5-3.5"/></svg>
+      <span class="sr-only">Buscar</span>
+      <input id="q" type="search" placeholder="Buscar producto o color" autocomplete="off" enterkeyhint="search">
+      <button class="clear" id="qClear" type="button" aria-label="Borrar búsqueda" hidden>×</button>
+    </label>
+    <button class="filter-btn" id="filterBtn" type="button" aria-haspopup="dialog" aria-label="Filtros">
+      <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M4 6h16M7 12h10M10 18h4"/></svg>
+      <span class="fb-text">Filtros</span>
+      <span class="fb-badge" id="filterBadge" hidden></span>
+    </button>
+  </div>
+  <nav class="cats" id="cats" aria-label="Categorías"></nav>
 </div>
-
-<nav class="filters" id="filters" aria-label="Filtros"></nav>
 
 <div class="meta">
-  <span id="count" aria-live="polite"></span>
+  <span class="meta-left"><span id="count" aria-live="polite"></span><button class="link-btn sm" id="clearAll" type="button" hidden>Limpiar filtros</button></span>
   <span class="meta-right">
     <span id="updated"></span>
     <button class="refresh" id="refreshBtn" type="button" aria-label="Actualizar catálogo">
@@ -91,14 +79,50 @@
 
 <footer class="foot">AURA · ACTIVEWEAR</footer>
 
+<!-- Barra inferior del modo admin -->
+<nav class="tabbar" id="adminNav" aria-label="Administración" hidden>
+  <button type="button" id="tabCatalog" data-view="catalog" aria-current="page">
+    <svg viewBox="0 0 24 24" aria-hidden="true"><rect x="4" y="4" width="7" height="7" rx="1.5"/><rect x="13" y="4" width="7" height="7" rx="1.5"/><rect x="4" y="13" width="7" height="7" rx="1.5"/><rect x="13" y="13" width="7" height="7" rx="1.5"/></svg>
+    <span>Catálogo</span>
+  </button>
+  <button type="button" id="tabSales" data-view="sales">
+    <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M6 3h12v18l-3-2-3 2-3-2-3 2z"/><path d="M9 8h6M9 12h6"/></svg>
+    <span>Ventas</span>
+  </button>
+  <button type="button" id="tabStats" data-view="stats">
+    <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M4 20V10M10 20V4M16 20v-7M22 20H2"/></svg>
+    <span>Números</span>
+  </button>
+  <button type="button" id="pdfBtn" aria-haspopup="dialog">
+    <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M14 3H7a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h10a2 2 0 0 0 2-2V8z"/><path d="M14 3v5h5"/><path d="M12 18v-6"/><path d="m9 15 3 3 3-3"/></svg>
+    <span id="pdfBtnText">Compartir PDF</span>
+  </button>
+</nav>
+
 <dialog class="sheet" id="menu" aria-labelledby="menuTitle">
   <div class="sheet-grip" aria-hidden="true"></div>
   <h2 id="menuTitle" class="sheet-title">Menú</h2>
   <button class="sheet-item" type="button" data-act="refresh">Actualizar catálogo</button>
   <button class="sheet-item" type="button" data-act="update">Buscar actualización de la app</button>
   <button class="sheet-item" type="button" data-act="install" id="installItem" hidden>Instalar app</button>
+  <button class="sheet-item danger" type="button" data-act="logout" id="logoutBtn" hidden>Cerrar sesión</button>
   <p class="sheet-note" id="versionNote"></p>
-  <button class="btn btn-ghost" type="button" data-act="close">Cerrar</button>
+  <button class="btn btn-ghost" type="button" data-close>Cerrar</button>
+</dialog>
+
+<dialog class="sheet" id="filterSheet" aria-labelledby="filterTitle">
+  <div class="sheet-grip" aria-hidden="true"></div>
+  <h2 id="filterTitle" class="sheet-title">Filtros</h2>
+  <div id="filterBody"></div>
+  <label class="switch" id="soldOutWrap" hidden>
+    <input type="checkbox" id="soldOut" role="switch">
+    <span class="track" aria-hidden="true"></span>
+    <span>Mostrar agotados</span>
+  </label>
+  <div class="sheet-actions">
+    <button class="btn btn-ghost" type="button" id="filterClear">Limpiar</button>
+    <button class="btn" type="button" id="filterApply" data-close>Ver modelos</button>
+  </div>
 </dialog>
 
 <dialog class="sheet" id="loginSheet" aria-labelledby="loginTitle">
@@ -120,16 +144,36 @@
 <dialog class="sheet" id="sellSheet" aria-labelledby="sellTitle">
   <form id="sellForm" method="dialog" novalidate>
     <div class="sheet-grip" aria-hidden="true"></div>
-    <h2 id="sellTitle" class="sheet-title">Registrar venta</h2>
+    <h2 id="sellTitle" class="sheet-title">Vender</h2>
     <div class="sell-product" id="sellProduct"></div>
-    <label class="field">
-      <span>Precio cobrado ($)</span>
-      <input id="sellPrice" type="text" inputmode="decimal" autocomplete="off" required>
-    </label>
+
+    <fieldset class="field">
+      <legend>Talla</legend>
+      <div class="size-opts" id="sizeOpts" role="radiogroup" aria-label="Talla"></div>
+      <p class="hint" id="sizeHint"></p>
+    </fieldset>
+
+    <div class="sell-row">
+      <div class="field">
+        <span id="qtyLabel">Cantidad</span>
+        <div class="stepper" role="group" aria-labelledby="qtyLabel">
+          <button type="button" id="qtyMinus" aria-label="Quitar una unidad">−</button>
+          <output id="qty" aria-live="polite">1</output>
+          <button type="button" id="qtyPlus" aria-label="Añadir una unidad">+</button>
+        </div>
+      </div>
+      <label class="field">
+        <span>Precio por unidad ($)</span>
+        <input id="sellPrice" type="text" inputmode="decimal" autocomplete="off" required>
+      </label>
+    </div>
+
     <label class="field">
       <span>Nota <small>(opcional)</small></span>
-      <input id="sellNote" type="text" maxlength="200" autocomplete="off" placeholder="Ej.: cliente, descuento, forma de pago">
+      <input id="sellNote" type="text" maxlength="200" autocomplete="off" placeholder="Cliente, descuento, forma de pago…">
     </label>
+
+    <p class="sell-total" id="sellTotal" aria-live="polite"></p>
     <p class="form-error" id="sellError" role="alert" hidden></p>
     <button class="btn" type="submit" id="sellSubmit">Confirmar venta</button>
     <button class="btn btn-ghost" type="button" data-close>Cancelar</button>
@@ -156,8 +200,10 @@
     <div class="pdf-actions">
       <button class="btn" type="button" id="pdfShare" hidden>Compartir…</button>
       <a class="btn btn-ghost" id="pdfOpen" target="_blank" rel="noopener">Abrir PDF</a>
-      <a class="btn btn-ghost" id="pdfDownload" target="_blank" rel="noopener">Descargar</a>
-      <button class="btn btn-ghost" type="button" id="pdfCopy">Copiar enlace</button>
+      <div class="pdf-pair">
+        <a class="btn btn-ghost" id="pdfDownload" target="_blank" rel="noopener">Descargar</a>
+        <button class="btn btn-ghost" type="button" id="pdfCopy">Copiar enlace</button>
+      </div>
     </div>
     <p class="pdf-status" id="pdfStatus" role="status" aria-live="polite"></p>
     <button class="link-btn" type="button" id="pdfRegen">Generar de nuevo</button>
@@ -169,6 +215,30 @@
   </div>
 
   <button class="btn btn-ghost" type="button" data-close id="pdfClose">Cerrar</button>
+</dialog>
+
+<dialog class="sheet detail" id="detailSheet" aria-labelledby="detailTitle">
+  <div class="sheet-grip" aria-hidden="true"></div>
+  <div class="detail-img" id="detailImg"></div>
+  <div class="detail-body" id="detailBody"></div>
+  <div class="detail-actions" id="detailActions" hidden></div>
+  <button class="btn btn-ghost" type="button" data-close>Cerrar</button>
+</dialog>
+
+<dialog class="sheet" id="socialSheet" aria-labelledby="socialTitle">
+  <div class="sheet-grip" aria-hidden="true"></div>
+  <h2 id="socialTitle" class="sheet-title">Imagen para redes</h2>
+  <div class="chips" id="socialFormats" role="group" aria-label="Formato">
+    <button type="button" class="chip" data-format="story" aria-pressed="true">Historia 9:16</button>
+    <button type="button" class="chip" data-format="post" aria-pressed="false">Publicación 4:5</button>
+  </div>
+  <div class="social-canvas" id="socialCanvasWrap"><canvas id="socialCanvas" width="1080" height="1920" role="img" aria-label="Vista previa de la imagen para redes"></canvas></div>
+  <p class="pdf-status" id="socialStatus" role="status" aria-live="polite"></p>
+  <div class="pdf-pair">
+    <button class="btn" type="button" id="socialShare" hidden>Compartir…</button>
+    <a class="btn btn-ghost" id="socialDownload" hidden>Descargar</a>
+  </div>
+  <button class="btn btn-ghost" type="button" data-close>Cerrar</button>
 </dialog>
 
 <dialog class="sheet" id="confirmSheet" aria-labelledby="confirmTitle">

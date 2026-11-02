@@ -7,25 +7,20 @@ App (GitHub Pages)  ⇄  Apps Script (dentro de tu Sheet)  ⇄  Google Sheet + D
 ```
 
 - **Costo: $0.** GitHub Pages y Apps Script son gratis.
-- **Tus costos nunca salen del Sheet.** La app solo recibe nombre, marca, color, talla, precio y unidades disponibles.
+- **Tus costos nunca salen al catálogo.** El catálogo público solo recibe nombre, marca, color, talla, precio, descripción y unidades disponibles. Los costos solo se ven en **Números**, con tu PIN.
 - **Funciona sin señal.** Guarda la última versión del catálogo y la muestra con el aviso «Sin conexión».
 
-> **Estado:** las 3 fases están listas:
-> 1. Catálogo, instalación en el teléfono y uso sin conexión.
-> 2. Modo admin: vender, deshacer, ventas y agotados.
-> 3. Compartir el catálogo en PDF.
+> **Importante:** para el **PDF vertical**, la **venta de varias unidades en una sola fila**, **Números** y las **imágenes para redes**, instala el Apps Script nuevo (sección 9). Mientras no lo hagas, la app sigue funcionando como antes.
 
 ---
 
 ## 1. Probar la demo (sin conectar nada)
 
-Abre la dirección de tu app y añade `?mock=1` al final. Por ejemplo:
+Abre la dirección de tu app y añade `?mock=1` al final:
 
 `https://hjsanoja.github.io/Aura/?mock=1`
 
-Verás el catálogo con productos de ejemplo y la etiqueta **DEMO** arriba a la izquierda.
-
-En la demo también puedes practicar el modo admin con el **PIN `1234`**. Las ventas de la demo son de mentira: no tocan tu Sheet y se borran al recargar la página.
+Verás productos de ejemplo y la etiqueta **DEMO** arriba a la izquierda. Puedes practicar el modo admin con el **PIN `1234`**. Las ventas de la demo son de mentira: no tocan tu Sheet y se borran al recargar la página.
 
 ---
 
@@ -36,8 +31,7 @@ En la demo también puedes practicar el modo admin con el **PIN `1234`**. Las ve
 3. En el menú de la izquierda, toca **Pages**.
 4. En **Source**, elige **Deploy from a branch**.
 5. En **Branch**, elige **main** y la carpeta **/ (root)**. Toca **Save**.
-6. Espera 1 o 2 minutos y recarga la página. Arriba aparece tu dirección, por ejemplo:
-   `https://hjsanoja.github.io/Aura/`
+6. Espera 1 o 2 minutos. Tu dirección es `https://hjsanoja.github.io/Aura/`.
 
 Cada vez que se suba un cambio al repositorio, la app se actualiza sola en 1 o 2 minutos.
 
@@ -47,14 +41,9 @@ Cada vez que se suba un cambio al repositorio, la app se actualiza sola en 1 o 2
 
 Cuando tengas la URL de tu Apps Script (termina en `/exec`):
 
-1. En GitHub, abre el archivo **`config.js`**.
-2. Toca el lápiz ✏️ (**Edit this file**).
-3. Cambia `PEGAR_AQUI_URL_DE_APPS_SCRIPT` por tu URL. Deja las comillas:
-   ```js
-   export const API_URL = "https://script.google.com/macros/s/XXXXXXXX/exec";
-   ```
-4. Toca **Commit changes…** y luego otra vez **Commit changes**.
-5. Espera 1 o 2 minutos y abre la app (sin `?mock=1`).
+1. En GitHub, abre el archivo **`config.js`** y toca el lápiz ✏️.
+2. Cambia `PEGAR_AQUI_URL_DE_APPS_SCRIPT` por tu URL, dejando las comillas.
+3. Toca **Commit changes…** y otra vez **Commit changes**. Espera 1 o 2 minutos.
 
 Si la app dice **«Falta conectar tu Sheet»**, la URL no está pegada o está mal copiada.
 
@@ -64,31 +53,24 @@ Si la app dice **«Falta conectar tu Sheet»**, la URL no está pegada o está m
 
 ### Android (Chrome)
 1. Abre la dirección de la app en **Chrome**.
-2. Toca el menú **⋮** (arriba a la derecha).
-3. Toca **Instalar app** (o **Añadir a pantalla de inicio**).
-4. Confirma. El ícono **A** de Aura aparece con tus apps.
-
-También puedes tocar el botón **⋯** de la app → **Instalar app**, si aparece.
+2. Toca el menú **⋮** → **Instalar app** (o **Añadir a pantalla de inicio**).
 
 ### iPhone (Safari)
-1. Abre la dirección de la app en **Safari**. Tiene que ser Safari, no Chrome.
-2. Toca el botón **Compartir** (el cuadrado con la flecha hacia arriba).
-3. Baja y toca **Añadir a pantalla de inicio**.
-4. Toca **Añadir**.
+1. Abre la dirección de la app en **Safari** (tiene que ser Safari).
+2. Toca **Compartir** (el cuadrado con la flecha) → **Añadir a pantalla de inicio** → **Añadir**.
 
 ---
 
 ## 5. Cómo se usa
 
 - **Buscar:** escribe en la barra (nombre, marca, color o código). No importan las tildes ni las mayúsculas.
-- **Filtrar:** toca los botones de **Género**, **Categoría** o **Marca**. Toca **Todos** para quitar el filtro.
-- **Actualizar:** toca la flecha circular ⟳ junto a «Actualizado hace…». La app también se actualiza sola al abrirla.
-- **Sin conexión:** verás el aviso amarillo «Sin conexión · mostrando copia de hace X». Cuando vuelva la señal, la app se actualiza sola.
-- **Menú ⋯:**
-  - **Actualizar catálogo**
-  - **Buscar actualización de la app**: si hay una versión nueva, aparece el botón **Actualizar**.
+- **Categorías:** toca una de las pastillas bajo el buscador. Cada una dice cuántos modelos tiene.
+- **Filtros:** el botón **Filtros** abre un panel con **Género** y **Marca**. El número en el botón indica cuántos filtros tienes puestos.
+- **Limpiar filtros:** aparece junto al contador de modelos cuando hay algo filtrado o buscado.
+- **Ver un producto en grande:** toca su **foto** o su **nombre**. Verás la foto grande, la descripción, las tallas y el precio.
+- **Actualizar:** la flecha circular ⟳ junto a «Actualizado…». La app también se actualiza sola al abrirla.
+- **Menú ☰:** actualizar catálogo, buscar actualización de la app y, en modo admin, cerrar sesión. Abajo dice qué versión del Apps Script tienes.
 
-### Qué significa cada etiqueta
 | Etiqueta | Significado |
 |---|---|
 | Verde «5 disp.» | Más de 3 unidades en total |
@@ -98,94 +80,125 @@ También puedes tocar el botón **⋯** de la app → **Instalar app**, si apare
 
 ---
 
-## 6. Modo admin: registrar ventas
+## 6. Modo admin
 
-Solo para ti y tu socio. Los PIN viven en tu Apps Script, nunca en GitHub.
+Solo para ti y tu socio. Toca el **candado 🔒**, escribe tu PIN y, si es tu teléfono, marca **Recordar en este dispositivo**. Abajo aparece una barra con:
 
-### Entrar
-1. Toca el **candado 🔒** arriba a la derecha.
-2. Escribe tu PIN.
-3. Si es tu teléfono, marca **Recordar en este dispositivo** para no escribirlo cada vez.
-4. Toca **Entrar**. Arriba verás **«Hola, (tu nombre)»** y el botón **Salir**.
+**Catálogo · Ventas · Números · Compartir PDF**
 
-Si fallas el PIN 8 veces en 10 minutos, el Script bloquea la entrada un rato y la app te muestra el aviso.
+Si fallas el PIN 8 veces en 10 minutos, el Script bloquea la entrada un rato.
 
 ### Vender
-1. Busca el producto y toca **Vender** junto a la talla.
-2. Revisa el **precio cobrado**: viene lleno con el precio de lista. Cámbialo si hiciste descuento (sirven `19`, `19.50` o `19,50`).
-3. Si quieres, escribe una **nota** (cliente, forma de pago…).
-4. Toca **Confirmar venta**. La tarjeta se actualiza al momento y tu Sheet suma 1 en `VENDIDA`.
+1. Toca **Vender** en el producto (o ábrelo en grande y toca **Vender**).
+2. Elige la **talla** (si solo hay una, ya viene elegida) y la **cantidad** con **−** y **+**.
+3. Revisa el **precio por unidad**: viene con el precio de lista; cámbialo si hiciste descuento (`19`, `19.50` o `19,50`).
+4. Si quieres, escribe una **nota** (cliente, forma de pago…).
+5. Toca **Vender N unidades · $total**. La tarjeta se actualiza al momento y tu Sheet suma las unidades en `VENDIDA`.
+
+Con el Apps Script nuevo, una venta de 3 unidades es **una sola fila** en la hoja Ventas (con la columna **Cantidad**). Con el anterior, queda una fila por unidad.
 
 ### ¿Te equivocaste?
-- Justo después de vender aparece **Deshacer** durante 8 segundos.
-- Después de eso: pestaña **Ventas** → **Anular** en la venta → **Anular venta**. La unidad vuelve al stock.
+- Justo después de vender aparece **Deshacer** durante 8 segundos (anula toda la venta).
+- Después: pestaña **Ventas** → **Anular** → **Anular venta**. Las unidades vuelven al stock.
+
+### Ventas
+- Arriba eliges el **periodo**: **Hoy**, **7 días**, **30 días** o **Todo**, y **quién vendió** (si son varios).
+- Ves lo **cobrado** y las **unidades** del periodo, y la lista agrupada por día con el total de cada día.
+
+### Números (rentabilidad) — necesita el Apps Script nuevo
+- **Vendido**, **Ganancia** y **margen**, **Inventario a costo** y **Ganancia por vender** (si vendes todo lo que queda).
+- **Inversión recuperada**: cuánto de lo invertido ya volvió en ventas.
+- **Ganancia por marca** y **por categoría**, **Lo más vendido** y **Sin vender todavía** (para moverlo: ponlo en historias, haz un combo…).
+- Los costos llevan **+15 %** de ajuste, como tu hoja «Margen Ajustado». Se cambia en el Apps Script (`AJUSTE_COSTO`).
+
+### Imagen para redes — necesita el Apps Script nuevo
+1. Abre un producto en grande y toca **Imagen para redes**.
+2. Elige **Historia 9:16** (Instagram/WhatsApp estados) o **Publicación 4:5** (feed).
+3. Toca **Compartir…** para mandarla directo a Instagram o WhatsApp, o **Descargar** para guardarla.
+
+La imagen lleva tu logo, la foto del producto, nombre, color, tallas, precio y «Escríbenos para apartar».
 
 ### Otras opciones
-- **Ventas:** muestra las últimas 40 ventas con precio cobrado, quién vendió, fecha, nota y estado (Activa / Anulada).
-- **Mostrar agotados:** enseña también lo que ya no tiene unidades, en gris.
-- **«Código+talla repetido»:** dos filas del Sheet tienen el mismo código y talla. La app no deja vender esa talla hasta que lo corrijas en el Sheet.
-- **Sin conexión:** puedes ver el catálogo, pero no vender. Verás «Necesitas conexión para registrar ventas».
-- **Salir:** cierra la sesión y borra el PIN guardado en ese teléfono.
+- **Mostrar agotados:** dentro de **Filtros**.
+- **«Código+talla repetido»:** dos filas del Sheet tienen el mismo código y talla. No se puede vender esa talla hasta corregirlo.
+- **Sin conexión:** puedes ver el catálogo, pero no vender.
 
 ---
 
 ## 7. Compartir el catálogo en PDF (para tus clientes)
 
-1. Entra al modo admin y toca **Compartir PDF**.
-2. Espera. Tu Apps Script arma el PDF con las fotos de Drive. **Puede tardar hasta 1 minuto.**
-   - Puedes cerrar la ventana mientras tanto. Cuando esté listo aparece abajo el aviso **«Tu catálogo PDF está listo» → Ver**.
-3. Cuando esté listo verás el nombre del archivo y cuántas páginas, modelos y unidades tiene. Elige:
-   - **Compartir…**: abre el menú del teléfono para mandarlo por WhatsApp, Instagram, correo, etc.
-   - **Abrir PDF**: lo ves antes de mandarlo.
-   - **Descargar**: lo guarda en el teléfono.
-   - **Copiar enlace**: copia el enlace para pegarlo donde quieras.
-4. Si vuelves a tocar **Compartir PDF**, aparece el último PDF sin esperar otra vez. Para uno nuevo, toca **Generar de nuevo**.
+1. En modo admin, toca **Compartir PDF** (barra de abajo).
+2. Espera (hasta 1 minuto). Puedes cerrar la ventana: te avisa cuando esté listo.
+3. Elige **Compartir…**, **Abrir PDF**, **Descargar** o **Copiar enlace**.
 
-Si pasan 90 segundos sin respuesta, la app deja de esperar y te deja **Reintentar**.
-
-En la demo (`?mock=1`), el PDF que se comparte es un ejemplo de 2 páginas.
+Con el Apps Script nuevo el PDF sale **vertical (A4)**, como el catálogo original:
+- **Portada** con modelos, unidades y marcas.
+- **Índice** con el número de página de cada categoría y género, y una guía «Cómo leer el catálogo».
+- **6 productos por página**, separados por **categoría y género**, con foto, marca, nombre, color, tallas, precio y disponibilidad.
+- Número de página abajo («3 / 9»).
 
 ---
 
-El catálogo se ordena por **categoría** (en el mismo orden en que aparecen en tu Sheet), luego **Mujer → Hombre → Unisex**, luego **marca** y **nombre**.
+## 8. Orden del catálogo
 
-Los productos que tienen la misma foto, nombre, color y precio se juntan en una sola tarjeta con sus tallas (`S: 1  M: 2`).
+Por **categoría** (en el orden en que aparecen en tu Sheet), luego **Mujer → Hombre → Unisex**, luego **marca** y **nombre**. Los productos con la misma foto, nombre, color y precio se juntan en una sola tarjeta con sus tallas.
+
+---
+
+## 9. Instalar el Apps Script nuevo (una sola vez, ~10 minutos)
+
+El código está en este repositorio: **`apps-script/Codigo.gs`**. Usa las mismas hojas y columnas que ya tienes (Inventario y Ventas) y no borra nada; solo añade la columna **Cantidad** al final de la hoja Ventas.
+
+1. **Guarda una copia del código viejo.** Abre tu Sheet → **Extensiones → Apps Script**. Selecciona todo el código (`Ctrl+A`), cópialo y pégalo en un documento aparte, por si hay que volver atrás.
+2. **Pega el nuevo.** En GitHub abre `apps-script/Codigo.gs`, toca **Copy raw file** (el ícono de copiar), vuelve a Apps Script, borra todo y pega. Guarda con el disquete 💾.
+3. **Activa Google Slides** (para el PDF vertical): a la izquierda, junto a **Servicios**, toca **+** → busca **Google Slides API** → **Agregar**.
+4. **Tus PIN.** Toca el engranaje ⚙️ **Configuración del proyecto** → abajo, **Propiedades del script** → **Agregar propiedad**:
+   - Propiedad `PIN_Nando`, valor: tu PIN (por ejemplo `1234`).
+   - Propiedad `PIN_Socio` (con el nombre de tu socio), valor: su PIN.
+   - El nombre después de `PIN_` es el que aparece en «Hola, …» y en la columna «Vendió».
+5. **Prueba el PDF desde el editor:** arriba elige la función **probarPdf** → **Ejecutar**. La primera vez Google pide permisos: **Revisar permisos → tu cuenta → Configuración avanzada → Ir a … (no seguro) → Permitir**. Es normal: es tu propio script. Al terminar, en **Registro de ejecución** aparece el enlace del PDF; ábrelo y revisa que sea vertical.
+6. **Publica la versión nueva sin cambiar la URL:** **Implementar → Gestionar implementaciones** → lápiz ✏️ → en **Versión** elige **Nueva versión** → **Implementar**.
+   - Así la URL `/exec` sigue igual y **no hay que tocar `config.js`**.
+7. En la app: **☰ → Actualizar catálogo**. En el menú debe decir **Apps Script v2**.
+
+**Si el paso 5 dice «Google no aceptó el tamaño vertical»:** crea en Google Drive una **Presentación** en blanco → **Archivo → Configurar página → Personalizado → 21 × 29,7 cm → Aplicar**. Copia su ID (la parte larga de la dirección entre `/d/` y `/edit`) y guárdalo como propiedad `PLANTILLA_PDF`. Vuelve a ejecutar **probarPdf**.
+
+**Si algo sale mal:** pega de nuevo el código viejo que guardaste en el paso 1 y vuelve a hacer el paso 6.
 
 ---
 
 ## Para quien mantenga el código
 
-- HTML, CSS y JavaScript sin frameworks, sin `npm` y sin compilar. Los archivos se suben tal cual.
-- Todas las rutas son relativas (`./`) porque Pages sirve la app en una subcarpeta.
-- **Al cambiar cualquier archivo de la app, sube `CACHE_VERSION` en `sw.js`** (y `APP_VERSION` en `app.js`). Así los teléfonos descargan la versión nueva. `config.js` no lo necesita: siempre se pide primero a internet.
-- No hay secretos en el repositorio. Los PIN se escriben en pantalla y, si se elige «Recordar», se guardan solo en ese teléfono.
-- Las ventas (POST) nunca se guardan ni se ponen en cola sin conexión.
+- HTML, CSS y JavaScript sin frameworks, sin `npm` y sin compilar.
+- Rutas relativas (`./`), porque Pages sirve la app en una subcarpeta.
+- **Al cambiar un archivo de la app, sube `CACHE_VERSION` en `sw.js`** (y `APP_VERSION` en `app.js`).
+- La app detecta la versión del Apps Script (`version: 2` en las respuestas). Con v1 vende unidad por unidad y oculta Números e Imagen para redes.
+- No hay secretos en el repositorio. Los PIN viven en las Propiedades del script.
 
 | Archivo | Para qué sirve |
 |---|---|
-| `index.html` | Estructura de la página |
-| `styles.css` | Diseño (colores, letras, tarjetas) |
-| `app.js` | Lógica: cargar, agrupar, filtrar y buscar |
+| `index.html`, `styles.css`, `app.js` | La app |
 | `api.js` | Conversación con el Apps Script |
 | `config.js` | **Tu URL del Apps Script** |
-| `sw.js` | Uso sin conexión y actualizaciones |
-| `manifest.webmanifest` | Nombre, ícono y colores al instalar |
-| `icons/` | Íconos (generados con `tools/make_icons.py`) |
-| `mock/catalog.json` | Datos de ejemplo para `?mock=1` |
-| `mock/fake-api.js` | Apps Script de mentira (demo y pruebas) |
-| `mock/catalogo-demo.pdf` | PDF de ejemplo de la demo (generado con `tools/make_demo_pdf.py`) |
+| `sw.js`, `manifest.webmanifest`, `icons/` | Instalación y uso sin conexión |
+| `apps-script/Codigo.gs` | **El Apps Script** (API, PDF vertical, Números, fotos) |
+| `mock/` | Datos y Apps Script de mentira para la demo y las pruebas |
 | `referencia/` | Catálogo PDF original (guía de diseño) |
+| `tools/` | Scripts que generaron los íconos y el PDF de la demo |
 | `tests/` | Pruebas automáticas (no afectan la app) |
 
 ### Pruebas
 ```bash
+node tests/apps-script.cjs
 node tests/fase1.cjs
 node tests/fase2.cjs
 node tests/fase3.cjs
+node tests/fase4.cjs
 ```
-Abren la app en Chromium sin ventana a 390×844 y guardan capturas en `tests/capturas/`:
-- `fase1`: catálogo y uso sin conexión (28 puntos).
-- `fase2`: modo admin contra el Apps Script de mentira (40 puntos), incluidos los errores y `dup:true`.
-- `fase3`: Compartir PDF (30 puntos), incluido el corte a los 90 s con un reloj simulado.
+- `apps-script`: el Apps Script con un Sheet simulado (38 puntos) y una vista previa del PDF vertical (`tests/capturas/pdf-preview.html`).
+- `fase1`: catálogo, filtros y uso sin conexión (32).
+- `fase2`: modo admin con el Apps Script anterior (56).
+- `fase3`: Compartir PDF (30).
+- `fase4`: Apps Script nuevo: cantidad en una fila, filtros de ventas, Números, detalle e imagen para redes (31).
 
 Para verla en tu computador: `node tests/server.cjs` y abre `http://127.0.0.1:8080/aura-catalogo/?mock=1`.
