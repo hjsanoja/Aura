@@ -78,11 +78,7 @@ function auth_(pin) {
   if (fails.length >= AURA.MAX_FALLOS) {
     throw new Error('Demasiados intentos fallidos. Espera ' + AURA.VENTANA_MIN + ' minutos antes de volver a intentarlo.');
   }
-  const props = PropertiesService.getScriptProperties().getProperties();
-  const users = {};
-  Object.keys(props).forEach((k) => {
-    if (/^PIN_/i.test(k) && String(props[k]).trim()) users[String(props[k]).trim()] = k.slice(4);
-  });
+  const users = pinUsers_();
   if (!Object.keys(users).length) {
     throw new Error('No hay PIN configurados. En Apps Script → Configuración → Propiedades del script, añade PIN_TuNombre.');
   }
@@ -93,6 +89,31 @@ function auth_(pin) {
     throw new Error('PIN incorrecto.');
   }
   return user;
+}
+
+/**
+ * Lee los PIN de las Propiedades del script. Acepta:
+ *   PIN_Nando = 173479            (recomendado)
+ *   PIN_Nando = Nando=173479      (también vale: se toma lo que va después de "=")
+ *   PINS      = Nando=173479, Valeria=1903
+ */
+function pinUsers_() {
+  const props = PropertiesService.getScriptProperties().getProperties();
+  const users = {};
+  const add = (name, pin) => {
+    name = String(name || '').trim(); pin = String(pin == null ? '' : pin).trim();
+    if (name && pin) users[pin] = name;
+  };
+  Object.keys(props).forEach((k) => {
+    const v = String(props[k] == null ? '' : props[k]).trim();
+    if (/^PIN_/i.test(k)) {
+      const m = v.match(/^([^=]+)=(.+)$/);
+      add(k.slice(4), m ? m[2] : v);
+    } else if (/^PINS?$/i.test(k)) {
+      v.split(/[,;\n]+/).forEach((par) => { const m = par.match(/^\s*([^=:]+)\s*[=:]\s*(.+?)\s*$/); if (m) add(m[1], m[2]); });
+    }
+  });
+  return users;
 }
 
 function withLock_(fn) {
@@ -631,7 +652,7 @@ function apiPdf_() {
   const name = 'Catalogo Aura ' + fmt_(now, 'yyyy-MM-dd') + '.pdf';
   const file = renderPdf_(pages, name);
   return {
-    ok: true, url: file.getUrl(), download: 'https://drive.google.com/uc?export=download&id=' + file.getId(),
+    ok: true, version: AURA.VERSION, formato: 'A4 vertical', url: file.getUrl(), download: 'https://drive.google.com/uc?export=download&id=' + file.getId(),
     name: name, fileId: file.getId(), pages: pages.length, models: cards.length,
     units: cards.reduce((n, c) => n + c.total, 0),
   };
@@ -788,4 +809,36 @@ function trashByName_(folder, name) {
 /** Para probar desde el editor: Ejecutar → probarPdf. Mira el resultado en "Registro de ejecución". */
 function probarPdf() {
   Logger.log(JSON.stringify(apiPdf_(), null, 2));
+}
+
+/** Igual que probarPdf, con un nombre que no existe en el código viejo. */
+function probarPdfAuraV2() {
+  diagnosticoAura();
+  probarPdf();
+}
+
+/**
+ * DIAGNÓSTICO: Ejecutar → diagnosticoAura. Revisa que esté activo el código nuevo,
+ * los PIN, el servicio de Slides y las hojas. Lee el "Registro de ejecución".
+ */
+function diagnosticoAura() {
+  const out = [];
+  const ok = (b, msg) => out.push((b ? '✅ ' : '❌ ') + msg);
+  // ¿Otro archivo del proyecto está pisando las funciones nuevas?
+  const nuevo = (fn) => { try { return String(fn).indexOf('route_') >= 0 || String(fn).indexOf('apiPdf_') >= 0; } catch (e) { return false; } };
+  ok(nuevo(doPost) && nuevo(doGet), 'doGet y doPost son los del código nuevo (v' + AURA.VERSION + ')');
+  ok(String(probarPdf).indexOf('apiPdf_') >= 0, 'probarPdf es la del código nuevo');
+  if (!(nuevo(doPost) && nuevo(doGet) && String(probarPdf).indexOf('apiPdf_') >= 0)) {
+    out.push('   → Hay OTRO archivo .gs con el código viejo en este proyecto. Bórralo (menú ⋮ del archivo → Eliminar) y deja solo el nuevo.');
+  }
+  const users = pinUsers_();
+  const names = Object.keys(users).map((p) => users[p]);
+  ok(names.length > 0, 'PIN configurados para: ' + (names.join(', ') || '(ninguno)'));
+  ok(typeof Slides !== 'undefined', 'Servicio "Google Slides API" activado');
+  try { const inv = readInventory_(); ok(true, 'Hoja Inventario: ' + inv.items.length + ' filas, ' + inv.items.filter((i) => i.disponible > 0).length + ' con disponibles'); }
+  catch (e) { ok(false, 'Hoja Inventario: ' + e.message); }
+  try { ventas_(); ok(true, 'Hoja Ventas lista (con columna Cantidad)'); } catch (e) { ok(false, 'Hoja Ventas: ' + e.message); }
+  out.push('Recuerda: después de cambiar el código, Implementar → Gestionar implementaciones → ✏️ → Nueva versión → Implementar.');
+  Logger.log('\n' + out.join('\n'));
+  return out;
 }
