@@ -89,6 +89,10 @@
     <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M6 3h12v18l-3-2-3 2-3-2-3 2z"/><path d="M9 8h6M9 12h6"/></svg>
     <span>Ventas</span>
   </button>
+  <button type="button" id="tabStats" data-view="stats">
+    <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M4 20V10M10 20V4M16 20v-7M22 20H2"/></svg>
+    <span>Números</span>
+  </button>
   <button type="button" id="pdfBtn" aria-haspopup="dialog">
     <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M14 3H7a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h10a2 2 0 0 0 2-2V8z"/><path d="M14 3v5h5"/><path d="M12 18v-6"/><path d="m9 15 3 3 3-3"/></svg>
     <span id="pdfBtnText">Compartir PDF</span>
@@ -211,6 +215,30 @@
   </div>
 
   <button class="btn btn-ghost" type="button" data-close id="pdfClose">Cerrar</button>
+</dialog>
+
+<dialog class="sheet detail" id="detailSheet" aria-labelledby="detailTitle">
+  <div class="sheet-grip" aria-hidden="true"></div>
+  <div class="detail-img" id="detailImg"></div>
+  <div class="detail-body" id="detailBody"></div>
+  <div class="detail-actions" id="detailActions" hidden></div>
+  <button class="btn btn-ghost" type="button" data-close>Cerrar</button>
+</dialog>
+
+<dialog class="sheet" id="socialSheet" aria-labelledby="socialTitle">
+  <div class="sheet-grip" aria-hidden="true"></div>
+  <h2 id="socialTitle" class="sheet-title">Imagen para redes</h2>
+  <div class="chips" id="socialFormats" role="group" aria-label="Formato">
+    <button type="button" class="chip" data-format="story" aria-pressed="true">Historia 9:16</button>
+    <button type="button" class="chip" data-format="post" aria-pressed="false">Publicación 4:5</button>
+  </div>
+  <div class="social-canvas" id="socialCanvasWrap"><canvas id="socialCanvas" width="1080" height="1920" role="img" aria-label="Vista previa de la imagen para redes"></canvas></div>
+  <p class="pdf-status" id="socialStatus" role="status" aria-live="polite"></p>
+  <div class="pdf-pair">
+    <button class="btn" type="button" id="socialShare" hidden>Compartir…</button>
+    <a class="btn btn-ghost" id="socialDownload" hidden>Descargar</a>
+  </div>
+  <button class="btn btn-ghost" type="button" data-close>Cerrar</button>
 </dialog>
 
 <dialog class="sheet" id="confirmSheet" aria-labelledby="confirmTitle">

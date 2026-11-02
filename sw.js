@@ -1,7 +1,7 @@
 // Service worker de Aura Catálogo.
 // IMPORTANTE: cambia CACHE_VERSION cada vez que se modifique un archivo de la app,
 // así los teléfonos descargan la versión nueva.
-const CACHE_VERSION = 'v1.3.0';
+const CACHE_VERSION = 'v1.4.0';
 const SHELL = `aura-shell-${CACHE_VERSION}`;
 const IMAGES = 'aura-img';
 const FONTS = 'aura-fonts';
