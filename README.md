@@ -81,10 +81,12 @@ También puedes tocar el botón **⋯** de la app → **Instalar app**, si apare
 ## 5. Cómo se usa
 
 - **Buscar:** escribe en la barra (nombre, marca, color o código). No importan las tildes ni las mayúsculas.
-- **Filtrar:** toca los botones de **Género**, **Categoría** o **Marca**. Toca **Todos** para quitar el filtro.
-- **Actualizar:** toca la flecha circular ⟳ junto a «Actualizado hace…». La app también se actualiza sola al abrirla.
+- **Categorías:** toca una de las pastillas bajo el buscador (Conjunto, Franela, Medias…). Cada una dice cuántos modelos tiene. **Todo** las muestra todas.
+- **Filtros:** el botón **Filtros** abre un panel con **Género** y **Marca**. El número en el botón indica cuántos filtros tienes puestos. **Ver N modelos** cierra el panel.
+- **Limpiar filtros:** aparece junto al contador de modelos cuando hay algo filtrado o buscado. Lo quita todo de un toque.
+- **Actualizar:** toca la flecha circular ⟳ junto a «Actualizado…». La app también se actualiza sola al abrirla.
 - **Sin conexión:** verás el aviso amarillo «Sin conexión · mostrando copia de hace X». Cuando vuelva la señal, la app se actualiza sola.
-- **Menú ⋯:**
+- **Menú ☰:**
   - **Actualizar catálogo**
   - **Buscar actualización de la app**: si hay una versión nueva, aparece el botón **Actualizar**.
 
@@ -106,32 +108,39 @@ Solo para ti y tu socio. Los PIN viven en tu Apps Script, nunca en GitHub.
 1. Toca el **candado 🔒** arriba a la derecha.
 2. Escribe tu PIN.
 3. Si es tu teléfono, marca **Recordar en este dispositivo** para no escribirlo cada vez.
-4. Toca **Entrar**. Arriba verás **«Hola, (tu nombre)»** y el botón **Salir**.
+4. Toca **Entrar**. Arriba verás **«Hola, (tu nombre)»** y abajo aparece una barra con 3 botones:
+   - **Catálogo**: para vender.
+   - **Ventas**: lo vendido.
+   - **Compartir PDF**: el catálogo para tus clientes.
 
 Si fallas el PIN 8 veces en 10 minutos, el Script bloquea la entrada un rato y la app te muestra el aviso.
 
 ### Vender
-1. Busca el producto y toca **Vender** junto a la talla.
-2. Revisa el **precio cobrado**: viene lleno con el precio de lista. Cámbialo si hiciste descuento (sirven `19`, `19.50` o `19,50`).
-3. Si quieres, escribe una **nota** (cliente, forma de pago…).
-4. Toca **Confirmar venta**. La tarjeta se actualiza al momento y tu Sheet suma 1 en `VENDIDA`.
+1. Busca el producto y toca **Vender** (hay un botón por producto).
+2. Elige la **talla**. Cada talla dice cuántas quedan; si solo hay una, ya viene elegida.
+3. Elige la **cantidad** con **−** y **+**. No te deja pasar de lo disponible.
+4. Revisa el **precio por unidad**: viene lleno con el precio de lista. Cámbialo si hiciste descuento (sirven `19`, `19.50` o `19,50`).
+5. Si quieres, escribe una **nota** (cliente, forma de pago…).
+6. Revisa el **total** y toca **Vender N unidades · $total**. La tarjeta se actualiza al momento y tu Sheet suma las unidades en `VENDIDA`.
+
+Cada unidad queda como una fila en tu hoja de ventas. Si vendes varias, la nota de cada fila termina en «unidad 1 de 3», «unidad 2 de 3», etc. Si se corta la conexión a mitad, la app te dice cuántas sí se registraron.
 
 ### ¿Te equivocaste?
-- Justo después de vender aparece **Deshacer** durante 8 segundos.
+- Justo después de vender aparece **Deshacer** durante 8 segundos. Anula todas las unidades de esa venta.
 - Después de eso: pestaña **Ventas** → **Anular** en la venta → **Anular venta**. La unidad vuelve al stock.
 
 ### Otras opciones
-- **Ventas:** muestra las últimas 40 ventas con precio cobrado, quién vendió, fecha, nota y estado (Activa / Anulada).
-- **Mostrar agotados:** enseña también lo que ya no tiene unidades, en gris.
+- **Ventas:** arriba ves lo cobrado **hoy** y en las últimas ventas. Abajo, las últimas 40 ventas agrupadas por día, con precio cobrado, quién vendió, hora, nota y estado (Activa / Anulada).
+- **Mostrar agotados:** está dentro de **Filtros**. Enseña también lo que ya no tiene unidades, en gris.
 - **«Código+talla repetido»:** dos filas del Sheet tienen el mismo código y talla. La app no deja vender esa talla hasta que lo corrijas en el Sheet.
 - **Sin conexión:** puedes ver el catálogo, pero no vender. Verás «Necesitas conexión para registrar ventas».
-- **Salir:** cierra la sesión y borra el PIN guardado en ese teléfono.
+- **Cerrar sesión:** en el menú ☰. Cierra la sesión y borra el PIN guardado en ese teléfono.
 
 ---
 
 ## 7. Compartir el catálogo en PDF (para tus clientes)
 
-1. Entra al modo admin y toca **Compartir PDF**.
+1. Entra al modo admin y toca **Compartir PDF** en la barra de abajo.
 2. Espera. Tu Apps Script arma el PDF con las fotos de Drive. **Puede tardar hasta 1 minuto.**
    - Puedes cerrar la ventana mientras tanto. Cuando esté listo aparece abajo el aviso **«Tu catálogo PDF está listo» → Ver**.
 3. Cuando esté listo verás el nombre del archivo y cuántas páginas, modelos y unidades tiene. Elige:
@@ -184,8 +193,8 @@ node tests/fase2.cjs
 node tests/fase3.cjs
 ```
 Abren la app en Chromium sin ventana a 390×844 y guardan capturas en `tests/capturas/`:
-- `fase1`: catálogo y uso sin conexión (28 puntos).
-- `fase2`: modo admin contra el Apps Script de mentira (40 puntos), incluidos los errores y `dup:true`.
+- `fase1`: catálogo, filtros y uso sin conexión (32 puntos).
+- `fase2`: modo admin contra el Apps Script de mentira (56 puntos), incluidos la venta de varias unidades, los errores y `dup:true`.
 - `fase3`: Compartir PDF (30 puntos), incluido el corte a los 90 s con un reloj simulado.
 
 Para verla en tu computador: `node tests/server.cjs` y abre `http://127.0.0.1:8080/aura-catalogo/?mock=1`.

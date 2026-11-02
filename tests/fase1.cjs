@@ -51,17 +51,27 @@ const check = (name, ok, extra = '') => { results.push({ name, ok }); console.lo
   check('Dentro de categoría: Mujer antes que Hombre', franela.join(',') === 'Mujer,Mujer,Mujer,Hombre,Hombre', franela.join(','));
   check('Stock verde si > 3', await page.locator('.pc', { hasText: 'Logo Rosa' }).locator('.stk.ok').count() === 1);
   check('"Última unidad" si queda 1', await page.locator('.pc', { hasText: 'Lavanda' }).locator('.stk.low').textContent() === 'Última unidad');
-  check('"Actualizado hace…"', (await page.textContent('#updated')).startsWith('Actualizado hace'));
+  check('"Actualizado ahora"', (await page.textContent('#updated')) === 'Actualizado ahora');
   await page.waitForTimeout(1500);
   await page.screenshot({ path: path.join(OUT, '2-catalogo.png') });
   await page.screenshot({ path: path.join(OUT, '3-catalogo-completo.png'), fullPage: true });
 
   // 3) Filtros y búsqueda
-  await page.click('.chip[data-field="genero"][data-value="Hombre"]');
+  await page.click('#filterBtn');
+  await page.waitForSelector('#filterSheet[open]');
+  await page.click('#filterBody .chip[data-field="genero"][data-value="Hombre"]');
+  check('Panel de filtros: botón "Ver 3 modelos"', (await page.textContent('#filterApply')) === 'Ver 3 modelos');
+  await page.waitForTimeout(300);
+  await page.screenshot({ path: path.join(OUT, '4a-panel-filtros.png') });
+  await page.click('#filterApply');
   check('Filtro Hombre → 3 modelos', (await page.textContent('#count')) === '3 modelos');
-  await page.evaluate(() => window.scrollTo(0, 330));
+  check('Globo del botón Filtros muestra 1', (await page.textContent('#filterBadge')) === '1');
+  await page.evaluate(() => window.scrollTo(0, 260));
   await page.screenshot({ path: path.join(OUT, '4-filtro-hombre.png') });
-  await page.click('.chip[data-field="genero"][data-value=""]');
+  await page.click('#cats .chip[data-value="Pantalón deportivo"]');
+  check('Categoría + género → 1 modelo', (await page.textContent('#count')) === '1 modelo');
+  await page.click('#clearAll');
+  check('"Limpiar filtros" junto al contador quita todo', (await page.textContent('#count')) === '17 modelos' && await page.isHidden('#filterBadge'));
   await page.fill('#q', 'lila');
   await page.waitForTimeout(300);
   check('Búsqueda "lila" → 1 modelo', (await page.textContent('#count')) === '1 modelo');
@@ -70,8 +80,8 @@ const check = (name, ok, extra = '') => { results.push({ name, ok }); console.lo
   check('Búsqueda sin tildes/mayúsculas', (await page.textContent('#count')) === '1 modelo');
   await page.fill('#q', 'zzzz');
   await page.waitForTimeout(300);
-  check('Estado vacío con "Limpiar filtros"', await page.isVisible('text=Limpiar filtros'));
-  await page.click('text=Limpiar filtros');
+  check('Estado vacío con "Limpiar filtros"', await page.isVisible('#content >> text=Limpiar filtros'));
+  await page.click('#content >> text=Limpiar filtros');
   check('Limpiar filtros restaura 17', (await page.textContent('#count')) === '17 modelos');
 
   // 4) Service worker y manifest

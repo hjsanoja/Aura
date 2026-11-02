@@ -70,7 +70,7 @@ const shot = async (page, name) => { await page.waitForTimeout(350); await page.
   await page.click('#pdfBtn');
   await page.waitForSelector('#pdfWorking:not([hidden])');
   check('Muestra "Generando catálogo… puede tardar hasta 1 minuto"', (await page.textContent('.pdf-msg')) === 'Generando catálogo… puede tardar hasta 1 minuto');
-  check('Botón cambia a "Generando PDF…"', (await page.textContent('#pdfBtnText')) === 'Generando PDF…');
+  check('Botón cambia a "Generando…"', (await page.textContent('#pdfBtnText')) === 'Generando…');
   await page.evaluate(() => { const b = document.querySelector('#pdfBtn'); b.click(); b.click(); });
   await shot(page, '21-pdf-generando.png');
   await page.waitForSelector('#pdfDone:not([hidden])');
@@ -148,6 +148,7 @@ const shot = async (page, name) => { await page.waitForTimeout(350); await page.
   await page.click('#pdfClose');
 
   // 9) Salir borra el PDF de la sesión
+  await page.click('#menuBtn');
   await page.click('#logoutBtn');
   check('Sin sesión no hay botón PDF', !(await page.isVisible('#pdfBtn')));
   await ctx.close();
