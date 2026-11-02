@@ -8,9 +8,10 @@ export function isConfigured() {
 }
 
 export class ApiError extends Error {
-  constructor(message, { network = false } = {}) {
+  constructor(message, { network = false, timeout = false } = {}) {
     super(message);
     this.network = network;
+    this.timeout = timeout;
   }
 }
 
@@ -21,10 +22,9 @@ async function request(url, options = {}, timeoutMs = 25000) {
   try {
     res = await fetch(url, { redirect: 'follow', cache: 'no-store', ...options, signal: ctrl.signal });
   } catch (err) {
-    const msg = err.name === 'AbortError'
-      ? 'El servidor tardó demasiado en responder.'
-      : 'No hay conexión con el servidor.';
-    throw new ApiError(msg, { network: true });
+    const timeout = err.name === 'AbortError';
+    const msg = timeout ? 'El servidor tardó demasiado en responder.' : 'No hay conexión con el servidor.';
+    throw new ApiError(msg, { network: true, timeout });
   } finally {
     clearTimeout(timer);
   }
@@ -53,7 +53,7 @@ async function mockApi() {
   if (!fake) {
     try {
       const { createFakeApi } = await import('./mock/fake-api.js');
-      fake = createFakeApi(seed.items);
+      fake = createFakeApi(seed.items, { pdfUrl: new URL('./mock/catalogo-demo.pdf', location.href).href });
     } catch {
       throw new ApiError('No hay conexión con el servidor.', { network: true });
     }
@@ -70,10 +70,20 @@ export async function getCatalog() {
 
 /** POST de administración. text/plain evita el "preflight" CORS que Apps Script no soporta. */
 export async function post(action, body = {}, timeoutMs = 30000) {
-  if (MOCK) return check(JSON.parse(JSON.stringify((await mockApi()).handle({ action, ...body }))));
+  if (MOCK) {
+    const api = await mockApi();
+    if (action === 'pdf') await new Promise((r) => setTimeout(r, 2500)); // el PDF real tarda más
+    return check(JSON.parse(JSON.stringify(api.handle({ action, ...body }))));
+  }
   return request(API_URL, {
     method: 'POST',
     headers: { 'Content-Type': 'text/plain;charset=utf-8' },
     body: JSON.stringify({ action, ...body }),
   }, timeoutMs);
+}
+
+/** Genera el catálogo en PDF (puede tardar 20–60 s; se corta a los 90 s). */
+export const PDF_TIMEOUT_MS = 90000;
+export function generatePdf(pin) {
+  return post('pdf', { pin }, PDF_TIMEOUT_MS);
 }

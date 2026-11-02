@@ -19,7 +19,7 @@ const PUBLIC_FIELDS = ['key', 'codigo', 'fileId', 'nombre', 'marca', 'color', 't
 const clone = (o) => JSON.parse(JSON.stringify(o));
 const fail = (error) => ({ ok: false, error });
 
-export function createFakeApi(seedItems, { users = DEMO_USERS, now = () => new Date() } = {}) {
+export function createFakeApi(seedItems, { users = DEMO_USERS, now = () => new Date(), pdfUrl = 'https://drive.google.com/file/d/DEMO_PDF/view' } = {}) {
   const items = seedItems.map((it) => ({ ...it, stock: it.stock ?? it.disponible, vendida: it.vendida ?? 0 }));
   items.push(...clone(EXTRA));
   const keyCount = {};
@@ -99,8 +99,23 @@ export function createFakeApi(seedItems, { users = DEMO_USERS, now = () => new D
         return { ok: true, sales: clone(sales.slice(0, limit)) };
       }
 
-      case 'pdf':
-        return fail('Compartir PDF todavía no está disponible (fase 3).');
+      case 'pdf': {
+        const disp = items.filter((i) => i.disponible > 0);
+        const models = new Set(disp.map((i) => [i.fileId, i.nombre, i.color, i.precio].join('|'))).size;
+        const units = disp.reduce((n, i) => n + i.disponible, 0);
+        const day = now().toISOString().slice(0, 10);
+        const local = !/^https:\/\/drive\.google\.com\//.test(pdfUrl);
+        return {
+          ok: true,
+          url: pdfUrl,
+          download: local ? pdfUrl : 'https://drive.google.com/uc?export=download&id=DEMO_PDF',
+          name: `Catalogo_Aura_${day}.pdf`,
+          fileId: 'DEMO_PDF',
+          pages: Math.ceil(models / 6) + 2,
+          models,
+          units,
+        };
+      }
 
       default:
         return fail(`Acción desconocida: ${action}`);
