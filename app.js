@@ -1,9 +1,8 @@
 // Aura Catálogo — lógica principal
-// Fase 1: catálogo de solo lectura · Fase 2: modo admin (vender, deshacer, ventas, agotados)
-// Fase 3: compartir el catálogo en PDF
+// Catálogo de solo lectura · modo admin (vender por cantidad, deshacer, ventas, agotados) · compartir PDF
 import { getCatalog, post, generatePdf, isConfigured, MOCK } from './api.js';
 
-export const APP_VERSION = '1.2.0';
+export const APP_VERSION = '1.3.0';
 const STORE_KEY = MOCK ? 'aura.catalog.mock.v1' : 'aura.catalog.v1';
 const ADMIN_STORE_KEY = MOCK ? 'aura.admin.mock.v1' : 'aura.admin.v1';
 const SESSION_KEY = MOCK ? 'aura.session.mock.v1' : 'aura.session.v1';
@@ -33,12 +32,14 @@ const state = {
 const esc = (s) => String(s ?? '').replace(/[&<>"']/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
 const norm = (s) => String(s ?? '').normalize('NFD').replace(/[̀-ͯ]/g, '').toLowerCase().trim();
 const money = (n) => (Number(n) || 0).toFixed(2);
+const plural = (n, one, many) => `${n} ${n === 1 ? one : many}`;
 const storage = {
   get(k) { try { return JSON.parse(localStorage.getItem(k)); } catch { return null; } },
   set(k, v) { try { localStorage.setItem(k, JSON.stringify(v)); } catch { /* sin espacio o modo privado */ } },
   del(k) { try { localStorage.removeItem(k); } catch { /* nada */ } },
 };
 const imgURL = (fileId) => `https://drive.google.com/thumbnail?id=${encodeURIComponent(fileId)}&sz=w400`;
+const ICON_BAG = '<svg viewBox="0 0 24 24" aria-hidden="true"><path d="M6 8h12l-1 12H7z"/><path d="M9 8V6a3 3 0 0 1 6 0v2"/></svg>';
 
 function timeAgo(date) {
   if (!date || isNaN(date)) return '';
@@ -52,10 +53,22 @@ function timeAgo(date) {
   return d === 1 ? 'hace 1 día' : `hace ${d} días`;
 }
 
-function fmtDate(v) {
+function dayKey(v) {
   const d = new Date(v);
-  if (!v || isNaN(d)) return String(v ?? '');
-  return d.toLocaleString('es', { day: 'numeric', month: 'short', hour: '2-digit', minute: '2-digit' });
+  return isNaN(d) ? '' : `${d.getFullYear()}-${d.getMonth()}-${d.getDate()}`;
+}
+function dayLabel(v) {
+  const d = new Date(v);
+  if (isNaN(d)) return 'Sin fecha';
+  const today = new Date();
+  const yest = new Date(); yest.setDate(today.getDate() - 1);
+  if (dayKey(d) === dayKey(today)) return 'Hoy';
+  if (dayKey(d) === dayKey(yest)) return 'Ayer';
+  return d.toLocaleDateString('es', { weekday: 'long', day: 'numeric', month: 'short' });
+}
+function fmtTime(v) {
+  const d = new Date(v);
+  return isNaN(d) ? String(v ?? '') : d.toLocaleTimeString('es', { hour: '2-digit', minute: '2-digit' });
 }
 
 function sizeRank(t) {
@@ -106,6 +119,88 @@ function groupItems(items) {
   return cards;
 }
 
+// ── Filtros ───────────────────────────────────────────────────
+const inPool = (c) => c.total > 0 || (state.admin && state.showSoldOut);
+
+function matches(c, { except = null } = {}) {
+  const f = state.filters;
+  const terms = norm(state.q).split(/\s+/).filter(Boolean);
+  return inPool(c) &&
+    (except === 'genero' || !f.genero || c.genero === f.genero) &&
+    (except === 'categoria' || !f.categoria || c.categoria === f.categoria) &&
+    (except === 'marca' || !f.marca || c.marca === f.marca) &&
+    terms.every((t) => c.search.includes(t));
+}
+const visibleCards = () => state.cards.filter((c) => matches(c));
+
+/** Filtros del panel (género, marca, agotados): los que cuentan para el globo del botón. */
+function sheetFilterCount() {
+  return (state.filters.genero ? 1 : 0) + (state.filters.marca ? 1 : 0) + (state.admin && state.showSoldOut ? 1 : 0);
+}
+const anyFilter = () => !!(state.q.trim() || state.filters.categoria || sheetFilterCount());
+
+function chipHTML(field, value, text, count) {
+  const cur = state.filters[field];
+  const on = value ? cur === value : !cur;
+  return `<button type="button" class="chip" data-field="${field}" data-value="${esc(value)}" aria-pressed="${on}">${esc(text)}${count !== undefined ? `<span class="n">${count}</span>` : ''}</button>`;
+}
+
+function renderCats() {
+  const pool = state.cards.filter((c) => matches(c, { except: 'categoria' }));
+  const cats = [...new Set(state.cards.filter(inPool).map((c) => c.categoria).filter(Boolean))];
+  const nav = $('#cats');
+  nav.hidden = cats.length < 2;
+  nav.innerHTML = chipHTML('categoria', '', 'Todo', pool.length) +
+    cats.map((cat) => chipHTML('categoria', cat, cat, pool.filter((c) => c.categoria === cat).length)).join('');
+}
+
+function renderFilterSheet() {
+  const uniq = (arr) => [...new Set(arr.filter(Boolean))];
+  const pool = state.cards.filter(inPool);
+  const generos = uniq(pool.map((c) => c.genero)).sort((a, b) => {
+    const ia = GENDER_ORDER.indexOf(a), ib = GENDER_ORDER.indexOf(b);
+    return (ia < 0 ? 9 : ia) - (ib < 0 ? 9 : ib);
+  });
+  const marcas = uniq(pool.map((c) => c.marca)).sort((a, b) => a.localeCompare(b, 'es'));
+  const group = (field, title, values, all) => {
+    if (values.length < 2) return '';
+    const base = state.cards.filter((c) => matches(c, { except: field }));
+    return `<div class="fgroup" role="group" aria-label="${title}"><h3>${title}</h3><div class="chips">${chipHTML(field, '', all)}${values.map((v) => chipHTML(field, v, v, base.filter((c) => c[field] === v).length)).join('')}</div></div>`;
+  };
+  $('#filterBody').innerHTML = group('genero', 'Género', generos, 'Todos') + group('marca', 'Marca', marcas, 'Todas');
+  $('#soldOutWrap').hidden = !state.admin;
+  $('#soldOut').checked = state.showSoldOut;
+  const n = visibleCards().length;
+  $('#filterApply').textContent = `Ver ${plural(n, 'modelo', 'modelos')}`;
+}
+
+function renderFilterBadge() {
+  const n = sheetFilterCount();
+  const badge = $('#filterBadge');
+  badge.hidden = !n;
+  badge.textContent = n;
+  $('#filterBtn').classList.toggle('on', !!n);
+  $('#filterBtn').setAttribute('aria-label', n ? `Filtros (${n} activo${n === 1 ? '' : 's'})` : 'Filtros');
+  $('#clearAll').hidden = !anyFilter();
+}
+
+function clearFilters() {
+  state.filters = { genero: null, categoria: null, marca: null };
+  state.q = '';
+  $('#q').value = '';
+  $('#qClear').hidden = true;
+  if (state.showSoldOut) { state.showSoldOut = false; }
+  refreshList();
+}
+
+/** Repinta todo lo que depende de los filtros. */
+function refreshList() {
+  renderCats();
+  renderFilterBadge();
+  renderGrid();
+  if ($('#filterSheet').open) renderFilterSheet();
+}
+
 // ── Pintar catálogo ───────────────────────────────────────────
 function stockTag(total) {
   if (total <= 0) return '<span class="stk none">Agotado</span>';
@@ -114,52 +209,37 @@ function stockTag(total) {
   return `<span class="stk low">${total} disp.</span>`;
 }
 
-function sizesHTML(c, { all = false } = {}) {
-  const sizes = state.admin && (state.showSoldOut || all) ? c.sizes : c.sizes.filter((s) => s.disponible > 0);
-  if (!state.admin) {
-    return `<div class="psizes">${sizes.map((s) =>
-      `<span class="szd${s.disponible <= 1 ? ' szlow' : ''}" aria-label="Talla ${esc(s.talla)}: ${s.disponible} disponible${s.disponible === 1 ? '' : 's'}">${esc(s.talla)}: ${s.disponible}</span>`).join('')}</div>`;
-  }
-  const canSell = state.isAdminData;
-  const rows = sizes.map((s) => {
-    const out = s.disponible <= 0;
-    const cls = out ? ' out' : s.disponible === 1 ? ' low' : '';
-    const label = s.dup ? 'Revisar' : 'Vender';
-    const disabled = !canSell || s.dup || out;
-    const btn = out && !s.dup ? '' :
-      `<button type="button" class="sell-btn" data-key="${esc(s.key)}" ${disabled ? 'disabled' : ''} aria-label="${esc(label)} talla ${esc(s.talla)} de ${esc(c.nombre)} ${esc(c.color)}">${label}</button>`;
-    return `<li class="sr${cls}"><span class="sr-t">${esc(s.talla)}</span><span class="sr-d">${out ? 'Agotado' : `${s.disponible} disp.`}</span>${btn}</li>` +
-      (s.dup ? '<li class="dup-note" role="note">Código+talla repetido: corrígelo en el Sheet</li>' : '');
-  }).join('');
-  return `<ul class="sell-list">${rows}</ul>`;
-}
-
-function cardHTML(c, opts = {}) {
+function cardHTML(c, { all = false } = {}) {
   const g = norm(c.genero);
   const img = c.fileId
     ? `<img src="${esc(imgURL(c.fileId))}" alt="${esc(c.nombre)}, color ${esc(c.color)}" loading="lazy" decoding="async" referrerpolicy="no-referrer">`
     : '';
+  const showAll = state.admin && (state.showSoldOut || all);
+  const sizes = showAll ? c.sizes : c.sizes.filter((s) => s.disponible > 0);
+  const chips = sizes.map((s) => {
+    const cls = s.dup && state.admin ? ' dup' : s.disponible <= 0 ? ' out' : s.disponible === 1 ? ' szlow' : '';
+    return `<span class="szd${cls}" aria-label="Talla ${esc(s.talla)}: ${s.disponible} disponible${s.disponible === 1 ? '' : 's'}">${esc(s.talla)}: ${s.disponible}</span>`;
+  }).join('');
+  let admin = '';
+  if (state.admin) {
+    const dups = c.sizes.filter((s) => s.dup).map((s) => s.talla);
+    const sellable = c.sizes.some((s) => s.disponible > 0 && !s.dup);
+    const disabled = !state.isAdminData || !sellable;
+    const label = c.total <= 0 ? 'Agotado' : !sellable ? 'Revisar en el Sheet' : 'Vender';
+    admin = (dups.length ? `<p class="dup-note" role="note">Código+talla repetido (${esc(dups.join(', '))}): corrígelo en el Sheet</p>` : '') +
+      `<button type="button" class="sell-btn" data-card="${c.id}" ${disabled ? 'disabled' : ''} aria-label="${esc(label)}: ${esc(c.nombre)} ${esc(c.color)}">${label === 'Vender' ? ICON_BAG : ''}${label}</button>`;
+  }
   return `<article class="pc${c.total <= 0 ? ' out' : ''}" data-card="${c.id}">
   <div class="pi${c.fileId ? '' : ' noimg'}">${img}${c.genero ? `<span class="gb g-${esc(g)}">${esc(c.genero)}</span>` : ''}</div>
   <div class="pb">
     <div class="pbrand">${esc(c.marca)}</div>
     <h3 class="pname">${esc(c.nombre)}</h3>
     <div class="pmeta">${esc(c.color)}</div>
-    ${sizesHTML(c, opts)}
+    <div class="psizes">${chips}</div>
     <div class="pfoot"><div class="pp" aria-label="Precio ${money(c.precio)} dólares"><small>$</small>${money(c.precio)}</div>${stockTag(c.total)}</div>
+    ${admin}
   </div>
 </article>`;
-}
-
-function visibleCards() {
-  const { q, filters: f } = state;
-  const terms = norm(q).split(/\s+/).filter(Boolean);
-  return state.cards.filter((c) =>
-    (c.total > 0 || (state.admin && state.showSoldOut)) &&
-    (!f.genero || c.genero === f.genero) &&
-    (!f.categoria || c.categoria === f.categoria) &&
-    (!f.marca || c.marca === f.marca) &&
-    terms.every((t) => c.search.includes(t)));
 }
 
 function renderStats() {
@@ -169,30 +249,12 @@ function renderStats() {
   $('#stBrands').textContent = new Set(cards.map((c) => c.marca).filter(Boolean)).size;
 }
 
-function renderFilters() {
-  const uniq = (arr) => [...new Set(arr.filter(Boolean))];
-  const pool = state.cards.filter((c) => c.total > 0 || (state.admin && state.showSoldOut));
-  const generos = uniq(pool.map((c) => c.genero)).sort((a, b) => {
-    const ia = GENDER_ORDER.indexOf(a), ib = GENDER_ORDER.indexOf(b);
-    return (ia < 0 ? 9 : ia) - (ib < 0 ? 9 : ib);
-  });
-  const categorias = uniq(pool.map((c) => c.categoria));
-  const marcas = uniq(pool.map((c) => c.marca)).sort((a, b) => a.localeCompare(b, 'es'));
-  const row = (field, label, values) => {
-    if (values.length < 2) return '';
-    const cur = state.filters[field];
-    const chip = (v, text) => `<button type="button" class="chip" data-field="${field}" data-value="${esc(v)}" aria-pressed="${cur === v || (!cur && v === '') ? 'true' : 'false'}">${esc(text)}</button>`;
-    return `<div class="frow" role="group" aria-label="${label}"><span class="flabel" aria-hidden="true">${label}</span>${chip('', 'Todos')}${values.map((v) => chip(v, v)).join('')}</div>`;
-  };
-  $('#filters').innerHTML = row('genero', 'Género', generos) + row('categoria', 'Categoría', categorias) + row('marca', 'Marca', marcas);
-}
-
 function renderGrid() {
   if (state.view !== 'catalog') return;
   const main = $('#content');
   const cards = visibleCards();
-  const anyVisible = state.cards.some((c) => c.total > 0 || (state.admin && state.showSoldOut));
-  $('#count').textContent = anyVisible ? `${cards.length} ${cards.length === 1 ? 'modelo' : 'modelos'}` : '';
+  const anyVisible = state.cards.some(inPool);
+  $('#count').textContent = anyVisible ? plural(cards.length, 'modelo', 'modelos') : '';
   if (!anyVisible) {
     main.innerHTML = `<div class="state"><h2>Sin productos disponibles</h2><p>Ahora mismo no hay productos con unidades disponibles en el catálogo.</p><div class="state-actions"><button class="btn" type="button" data-act="refresh">Actualizar</button></div></div>`;
     return;
@@ -211,20 +273,19 @@ function renderGrid() {
     const n = s.cards.length;
     const gens = [...new Set(s.cards.map((c) => c.genero).filter(Boolean))].join(' · ');
     return `<section class="section" aria-label="${esc(s.cat)}">
-  <h2 class="sh">${esc(s.cat || 'Otros')} <span class="shs">${esc(gens)}${gens ? ' · ' : ''}${n} ${n === 1 ? 'modelo' : 'modelos'}</span></h2>
+  <h2 class="sh">${esc(s.cat || 'Otros')} <span class="shs">${esc(gens)}${gens ? ' · ' : ''}${plural(n, 'modelo', 'modelos')}</span></h2>
   <div class="grid">${s.cards.map((c) => cardHTML(c)).join('')}</div>
 </section>`;
   }).join('');
 }
 
 function renderUpdated() {
-  $('#updated').textContent = state.updated ? `Actualizado ${timeAgo(state.updated)}` : '';
+  const ago = timeAgo(state.updated);
+  $('#updated').textContent = state.updated ? `Actualizado ${ago === 'hace un momento' ? 'ahora' : ago}` : '';
   const banner = $('#banner');
   const offlineNow = state.offline || (state.admin && !navigator.onLine);
   if (offlineNow) {
-    const parts = [];
-    if (state.offline) parts.push(`Sin conexión · mostrando copia de ${timeAgo(state.savedAt || state.updated)}`);
-    else parts.push('Sin conexión');
+    const parts = [state.offline ? `Sin conexión · mostrando copia de ${timeAgo(state.savedAt || state.updated)}` : 'Sin conexión'];
     if (state.admin) parts.push(OFFLINE_SELL_MSG);
     banner.textContent = parts.join(' · ');
     banner.hidden = false;
@@ -235,7 +296,8 @@ function renderUpdated() {
 
 function renderAll() {
   renderStats();
-  renderFilters();
+  renderCats();
+  renderFilterBadge();
   renderGrid();
   renderUpdated();
 }
@@ -354,12 +416,8 @@ export function toast(msg, { error = false, action = null, duration = 4000 } = {
 }
 
 // ── Hojas (diálogos) ──────────────────────────────────────────
-function openSheet(d) {
-  if (!d.open) d.showModal();
-}
-function closeSheet(d) {
-  if (d.open) d.close();
-}
+function openSheet(d) { if (!d.open) d.showModal(); }
+function closeSheet(d) { if (d.open) d.close(); }
 function wireSheet(d) {
   d.addEventListener('click', (e) => {
     if (e.target === d && !d.dataset.busy) closeSheet(d); // toque fuera
@@ -397,7 +455,7 @@ function renderSession() {
   $('#lockBtn').hidden = !!a;
   $('#hello').hidden = !a;
   $('#logoutBtn').hidden = !a;
-  $('#adminbar').hidden = !a;
+  $('#adminNav').hidden = !a;
   if (a) $('#hello').textContent = `Hola, ${a.user || 'admin'}`;
   if (!a) setView('catalog');
 }
@@ -422,7 +480,7 @@ async function login(e) {
     closeSheet(d);
     $('#pin').value = '';
     renderSession();
-    toast(`Hola, ${res.user}. Ya puedes registrar ventas.`);
+    toast(`Hola, ${res.user}. Toca «Vender» en cualquier producto.`);
     await load();
   } catch (ex) {
     setBusy(d, btn, false);
@@ -434,11 +492,10 @@ async function login(e) {
 function logout({ silent = false } = {}) {
   state.admin = null;
   state.sales = null;
+  state.showSoldOut = false;
   pdf.result = null;
   pdf.error = null;
-  closeSheet($('#pdfSheet'));
-  state.showSoldOut = false;
-  $('#soldOut').checked = false;
+  ['#pdfSheet', '#sellSheet', '#filterSheet'].forEach((s) => closeSheet($(s)));
   storage.del(SESSION_KEY);
   storage.del(ADMIN_STORE_KEY);
   renderSession();
@@ -450,78 +507,152 @@ function logout({ silent = false } = {}) {
   if (!silent) toast('Sesión cerrada');
 }
 
-// ── Vender ────────────────────────────────────────────────────
-let selling = null; // { item, card }
+// ── Vender (talla + cantidad) ─────────────────────────────────
+const sell = { cardId: null, key: null, qty: 1 };
 
-function findItem(key) {
-  return state.items.find((i) => i.key === key && !i.dup) || state.items.find((i) => i.key === key);
+function sellCard() { return state.cards.find((c) => c.id === sell.cardId); }
+function sellSize() { return sellCard()?.sizes.find((s) => s.key === sell.key && !s.dup) || null; }
+function findItem(key) { return state.items.find((i) => i.key === key && !i.dup); }
+
+function parsePrice() {
+  const raw = $('#sellPrice').value.trim().replace(/\s/g, '').replace(',', '.');
+  const n = Number(raw);
+  return raw && isFinite(n) && n >= 0 ? Math.round(n * 100) / 100 : null;
 }
 
-function openSell(key) {
+function renderSellSheet() {
+  const c = sellCard();
+  if (!c) return;
+  const size = sellSize();
+  const max = size ? size.disponible : 0;
+  sell.qty = Math.max(1, Math.min(sell.qty, max || 1));
+  $('#sizeOpts').innerHTML = c.sizes.map((s) => {
+    const disabled = s.dup || s.disponible <= 0;
+    const sub = s.dup ? 'revisar' : s.disponible <= 0 ? 'agotada' : `${s.disponible} disp.`;
+    return `<button type="button" class="size-opt${s.dup ? ' dup' : ''}" role="radio" data-key="${esc(s.key)}" aria-checked="${s.key === sell.key && !s.dup}" ${disabled ? 'disabled' : ''} aria-label="Talla ${esc(s.talla)}, ${esc(sub)}"><b>${esc(s.talla)}</b><small>${esc(sub)}</small></button>`;
+  }).join('');
+  const dups = c.sizes.filter((s) => s.dup).map((s) => s.talla);
+  const hint = $('#sizeHint');
+  if (dups.length) { hint.textContent = `Código+talla repetido (${dups.join(', ')}): corrígelo en el Sheet para venderla.`; hint.className = 'hint warn'; }
+  else if (!size) { hint.textContent = 'Elige la talla que vendiste.'; hint.className = 'hint'; }
+  else { hint.textContent = ''; hint.className = 'hint'; }
+
+  $('#qty').textContent = sell.qty;
+  $('#qtyMinus').disabled = !size || sell.qty <= 1;
+  $('#qtyPlus').disabled = !size || sell.qty >= max;
+  $('#qtyLabel').textContent = size ? `Cantidad (máx. ${max})` : 'Cantidad';
+
+  const price = parsePrice();
+  const btn = $('#sellSubmit');
+  if (!size) {
+    $('#sellTotal').innerHTML = '';
+    if (!$('#sellSheet').dataset.busy) { btn.textContent = 'Elige una talla'; btn.disabled = true; }
+    return;
+  }
+  const total = price === null ? null : price * sell.qty;
+  $('#sellTotal').innerHTML = total === null ? '' :
+    `<span>${sell.qty} × $${money(price)} · talla ${esc(size.talla)}</span><b>$${money(total)}</b>`;
+  if (!$('#sellSheet').dataset.busy) {
+    btn.disabled = false;
+    btn.textContent = total === null ? 'Confirmar venta' : `Vender ${plural(sell.qty, 'unidad', 'unidades')} · $${money(total)}`;
+  }
+}
+
+function openSell(cardId) {
   if (!state.admin) return;
   if (!navigator.onLine || !state.isAdminData) { toast(OFFLINE_SELL_MSG, { error: true }); return; }
-  const item = findItem(key);
-  if (!item) return;
-  if (item.dup) { toast('Código+talla repetido: corrígelo en el Sheet', { error: true }); return; }
-  if (Number(item.disponible) <= 0) { toast('Ya no quedan unidades de esta talla.', { error: true }); return; }
-  selling = { key };
-  const img = item.fileId ? `<img src="${esc(imgURL(item.fileId))}" alt="" referrerpolicy="no-referrer">` : '<div class="ph"></div>';
-  $('#sellProduct').innerHTML = `${img}<div><b>${esc(item.nombre)}</b><span>${esc(item.color)} · Talla <strong>${esc(item.talla)}</strong></span><span>${item.disponible} disponible${item.disponible == 1 ? '' : 's'} · Lista: $${money(item.precio)}</span></div>`;
-  $('#sellPrice').value = money(item.precio);
+  const c = state.cards.find((x) => x.id === cardId);
+  if (!c) return;
+  const sellable = c.sizes.filter((s) => s.disponible > 0 && !s.dup);
+  if (!sellable.length) { toast('Este producto no tiene tallas disponibles para vender.', { error: true }); return; }
+  sell.cardId = cardId;
+  sell.key = sellable.length === 1 ? sellable[0].key : null; // con varias tallas, que la persona elija
+  sell.qty = 1;
+  const img = c.fileId ? `<img src="${esc(imgURL(c.fileId))}" alt="" referrerpolicy="no-referrer">` : '<div class="ph"></div>';
+  $('#sellProduct').innerHTML = `${img}<div><b>${esc(c.nombre)}</b><span>${esc(c.marca)} · ${esc(c.color)}</span><span>Precio de lista: $${money(c.precio)}</span></div>`;
+  $('#sellPrice').value = money(c.precio);
   $('#sellNote').value = '';
   showFormError($('#sellError'), '');
+  renderSellSheet();
   openSheet($('#sellSheet'));
 }
 
 async function confirmSell(e) {
   e.preventDefault();
   const d = $('#sellSheet');
-  if (d.dataset.busy || !selling) return; // evita doble envío
+  if (d.dataset.busy) return; // evita doble envío
   const err = $('#sellError');
-  const raw = $('#sellPrice').value.trim().replace(/\s/g, '').replace(',', '.');
-  const precio = Number(raw);
-  if (!raw || !isFinite(precio) || precio < 0) { showFormError(err, 'Escribe un precio válido (por ejemplo 19 o 19.50).'); $('#sellPrice').focus(); return; }
+  const size = sellSize();
+  const card = sellCard();
+  if (!size || !card) { showFormError(err, 'Elige la talla que vendiste.'); return; }
+  const precio = parsePrice();
+  if (precio === null) { showFormError(err, 'Escribe un precio válido (por ejemplo 19 o 19.50).'); $('#sellPrice').focus(); return; }
   if (!navigator.onLine) { showFormError(err, OFFLINE_SELL_MSG + '.'); return; }
+  const qty = Math.min(sell.qty, size.disponible);
   showFormError(err, '');
   const btn = $('#sellSubmit');
-  setBusy(d, btn, true, 'Registrando…');
+  setBusy(d, btn, true, qty > 1 ? `Registrando 1 de ${qty}…` : 'Registrando…');
   const nota = $('#sellNote').value.trim();
-  const { key } = selling;
-  try {
-    const res = await post('sell', { pin: state.admin.pin, key, precio: Math.round(precio * 100) / 100, ...(nota ? { nota } : {}) });
-    setBusy(d, btn, false);
-    closeSheet(d);
-    selling = null;
-    if (res.item) updateItem(res.item);
-    state.sales = null; // la lista de ventas cambió
-    const it = res.item || findItem(key) || {};
-    toast(`Venta registrada: ${it.nombre || ''} · talla ${it.talla || ''}`, {
-      duration: UNDO_MS,
-      action: { label: 'Deshacer', onClick: () => undoSale(res.saleId) },
-    });
-  } catch (ex) {
-    setBusy(d, btn, false);
-    showFormError(err, ex.network ? `${OFFLINE_SELL_MSG}. No se registró la venta.` : ex.message);
+  const key = size.key;
+  const saleIds = [];
+  let lastItem = null;
+  let failure = null;
+  // El Apps Script registra 1 unidad por llamada: repetimos «sell» tantas veces como unidades.
+  for (let i = 1; i <= qty; i++) {
+    if (qty > 1) btn.textContent = `Registrando ${i} de ${qty}…`;
+    const notaN = qty > 1 ? `${nota ? nota + ' · ' : ''}unidad ${i} de ${qty}` : nota;
+    try {
+      const res = await post('sell', { pin: state.admin.pin, key, precio, ...(notaN ? { nota: notaN } : {}) });
+      saleIds.push(res.saleId);
+      if (res.item) lastItem = res.item;
+    } catch (ex) {
+      failure = ex;
+      break;
+    }
+  }
+  setBusy(d, btn, false);
+  const errMsg = failure && (failure.network ? `${OFFLINE_SELL_MSG}.` : failure.message);
+  if (!saleIds.length) {
+    showFormError(err, failure.network ? `${OFFLINE_SELL_MSG}. No se registró la venta.` : failure.message);
+    renderSellSheet();
+    return;
+  }
+  closeSheet(d);
+  if (lastItem) updateItem(lastItem);
+  state.sales = null; // la lista de ventas cambió
+  const what = `${saleIds.length} × ${card.nombre} (talla ${size.talla})`;
+  const undo = { label: 'Deshacer', onClick: () => undoSales(saleIds) };
+  if (failure) {
+    toast(`Solo se registraron ${saleIds.length} de ${qty}: ${errMsg}`, { error: true, duration: 12000, action: undo });
+  } else {
+    toast(`Vendiste ${what} · $${money(precio * saleIds.length)}`, { duration: UNDO_MS, action: undo });
   }
 }
 
-async function undoSale(saleId, { fromList = false } = {}) {
-  if (!saleId || !state.admin) return false;
+async function undoSales(saleIds, { fromList = false } = {}) {
+  if (!saleIds.length || !state.admin) return false;
   if (!navigator.onLine) { toast(OFFLINE_SELL_MSG, { error: true }); return false; }
-  try {
-    const res = await post('undo', { pin: state.admin.pin, saleId });
-    if (res.item) updateItem(res.item);
-    if (state.sales) {
-      const s = state.sales.find((x) => x.id === saleId);
+  let done = 0;
+  let lastItem = null;
+  for (const id of [...saleIds].reverse()) {
+    try {
+      const res = await post('undo', { pin: state.admin.pin, saleId: id });
+      done++;
+      if (res.item) lastItem = res.item;
+      const s = state.sales && state.sales.find((x) => x.id === id);
       if (s) s.estado = 'Anulada';
+    } catch (ex) {
+      if (lastItem) updateItem(lastItem);
+      const msg = ex.network ? OFFLINE_SELL_MSG : ex.message;
+      toast(done ? `Se anularon ${done} de ${saleIds.length}: ${msg}. Revisa la pestaña Ventas.` : `No se anuló la venta: ${msg}`, { error: true, duration: 8000 });
+      if (!fromList && state.view === 'sales') renderSales();
+      return false;
     }
-    if (!fromList && state.view === 'sales') renderSales();
-    toast('Venta anulada. La unidad volvió al stock.');
-    return true;
-  } catch (ex) {
-    toast(ex.network ? `${OFFLINE_SELL_MSG}. No se anuló la venta.` : ex.message, { error: true, duration: 6000 });
-    return false;
   }
+  if (lastItem) updateItem(lastItem);
+  if (!fromList && state.view === 'sales') renderSales();
+  toast(done > 1 ? `Venta anulada: ${done} unidades volvieron al stock.` : 'Venta anulada. La unidad volvió al stock.');
+  return true;
 }
 
 /** Actualiza una talla con el item que devuelve el servidor, sin recargar todo. */
@@ -532,25 +663,24 @@ function updateItem(item) {
   state.cards = groupItems(state.items);
   saveAdminCache();
   renderStats();
+  renderCats();
   const card = state.cards.find((c) => c.sizes.some((s) => s.key === item.key));
-  const el = card && document.querySelector(`[data-card="${card.id}"]`);
-  if (el && state.view === 'catalog') {
-    el.outerHTML = cardHTML(card, { all: true });
-  } else {
-    renderGrid();
-  }
+  const el = card && document.querySelector(`.pc[data-card="${card.id}"]`);
+  if (el && state.view === 'catalog') el.outerHTML = cardHTML(card, { all: true });
+  else renderGrid();
 }
 
-// ── Ventas ────────────────────────────────────────────────────
+// ── Vistas: catálogo / ventas ─────────────────────────────────
 function setView(v) {
   state.view = v;
-  $('#tabCatalog').setAttribute('aria-selected', String(v === 'catalog'));
-  $('#tabSales').setAttribute('aria-selected', String(v === 'sales'));
   const isCat = v === 'catalog';
+  const mark = (el, on) => (on ? el.setAttribute('aria-current', 'page') : el.removeAttribute('aria-current'));
+  mark($('#tabCatalog'), isCat);
+  mark($('#tabSales'), !isCat);
   $('.searchbar').hidden = !isCat;
-  $('#filters').hidden = !isCat;
   $('.meta').hidden = !isCat;
-  $('#soldOutWrap').hidden = !isCat;
+  document.body.classList.toggle('view-sales', !isCat);
+  window.scrollTo({ top: 0 });
   if (isCat) renderGrid();
   else loadSales();
 }
@@ -584,22 +714,36 @@ function renderSales() {
   if (state.view !== 'sales') return;
   const sales = state.sales || [];
   const active = sales.filter(isActive);
-  const total = active.reduce((n, s) => n + (Number(s.precioCobrado) || 0), 0);
-  const head = `<div class="sales-head"><h2>Últimas ventas</h2>
-  <span class="sales-sum">${active.length} activa${active.length === 1 ? '' : 's'} · <b>$${money(total)}</b> cobrado
-  <button class="refresh" type="button" data-act="reload-sales" aria-label="Actualizar ventas" style="display:inline-grid;vertical-align:middle"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M20 11a8 8 0 1 0-2.3 5.7"/><path d="M20 4v7h-7"/></svg></button></span></div>`;
+  const today = dayKey(new Date());
+  const todays = active.filter((s) => dayKey(s.fecha) === today);
+  const sum = (arr) => arr.reduce((n, s) => n + (Number(s.precioCobrado) || 0), 0);
+  const head = `<div class="sales-head">
+  <h2>Ventas <button class="refresh" type="button" data-act="reload-sales" aria-label="Actualizar ventas"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M20 11a8 8 0 1 0-2.3 5.7"/><path d="M20 4v7h-7"/></svg></button></h2>
+  <div class="kpis">
+    <div class="kpi"><span>Hoy</span><b>$${money(sum(todays))}</b><small>${plural(todays.length, 'unidad', 'unidades')}</small></div>
+    <div class="kpi"><span>Últimas ${sales.length || 40}</span><b>$${money(sum(active))}</b><small>${plural(active.length, 'activa', 'activas')}</small></div>
+  </div>
+</div>`;
   if (!sales.length) {
-    $('#content').innerHTML = head + '<div class="state"><h2>Aún no hay ventas</h2><p>Cuando registres una venta desde el catálogo aparecerá aquí.</p></div>';
+    $('#content').innerHTML = head + '<div class="state"><h2>Aún no hay ventas</h2><p>Cuando vendas desde el catálogo, aparecerán aquí.</p></div>';
     return;
   }
-  $('#content').innerHTML = head + `<ul class="sales">${sales.map((s) => {
+  let html = '';
+  let lastDay = null;
+  for (const s of sales) {
+    const dk = dayKey(s.fecha);
+    if (dk !== lastDay) {
+      if (lastDay !== null) html += '</ul>';
+      html += `<h3 class="day">${esc(dayLabel(s.fecha))}</h3><ul class="sales">`;
+      lastDay = dk;
+    }
     const act = isActive(s);
-    const diff = Number(s.precioCatalogo) !== Number(s.precioCobrado) && s.precioCatalogo !== undefined && s.precioCatalogo !== '';
-    return `<li class="sale${act ? '' : ' void'}">
+    const diff = s.precioCatalogo !== undefined && s.precioCatalogo !== '' && Number(s.precioCatalogo) !== Number(s.precioCobrado);
+    html += `<li class="sale${act ? '' : ' void'}">
   <div class="sale-main">
     <b>${esc(s.producto)}</b>
     <span class="l">Talla ${esc(s.talla)}${diff ? ` · lista $${money(s.precioCatalogo)}` : ''}</span>
-    <span class="l">${esc(fmtDate(s.fecha))}${s.vendio ? ` · ${esc(s.vendio)}` : ''}</span>
+    <span class="l">${esc(fmtTime(s.fecha))}${s.vendio ? ` · ${esc(s.vendio)}` : ''}</span>
     ${s.nota ? `<span class="l n">“${esc(s.nota)}”</span>` : ''}
   </div>
   <div class="sale-side">
@@ -608,7 +752,8 @@ function renderSales() {
     ${act ? `<button type="button" class="void-btn" data-void="${esc(s.id)}">Anular</button>` : ''}
   </div>
 </li>`;
-  }).join('')}</ul>`;
+  }
+  $('#content').innerHTML = head + html + '</ul>';
 }
 
 async function voidSale(id, btn) {
@@ -622,7 +767,7 @@ async function voidSale(id, btn) {
   if (!ok) return;
   btn.disabled = true;
   btn.textContent = 'Anulando…';
-  const done = await undoSale(id, { fromList: true });
+  const done = await undoSales([id], { fromList: true });
   if (!done) { btn.disabled = false; btn.textContent = 'Anular'; return; }
   renderSales();
 }
@@ -663,7 +808,7 @@ function renderPdfSheet() {
   }
   if (!pdf.result) return;
   const r = pdf.result;
-  const n = (v, one, many) => (v === undefined || v === null || v === '' ? '' : `${v} ${Number(v) === 1 ? one : many}`);
+  const n = (v, one, many) => (v === undefined || v === null || v === '' ? '' : plural(Number(v), one, many));
   $('#pdfName').textContent = r.name || 'Catálogo Aura.pdf';
   $('#pdfMeta').textContent = [n(r.pages, 'página', 'páginas'), n(r.models, 'modelo', 'modelos'), n(r.units, 'unidad', 'unidades'), `generado ${timeAgo(pdf.at)}`].filter(Boolean).join(' · ');
   $('#pdfOpen').href = r.url;
@@ -681,9 +826,8 @@ function tickPdf() {
 }
 
 function setPdfButton(busy) {
-  const b = $('#pdfBtn');
-  b.setAttribute('aria-busy', String(busy));
-  $('#pdfBtnText').textContent = busy ? 'Generando PDF…' : 'Compartir PDF';
+  $('#pdfBtn').setAttribute('aria-busy', String(busy));
+  $('#pdfBtnText').textContent = busy ? 'Generando…' : 'Compartir PDF';
 }
 
 function openPdf() {
@@ -713,9 +857,8 @@ async function startPdf() {
   renderPdfSheet();
   openSheet(sheet);
   pdf.timer = setInterval(tickPdf, 1000);
-  const pin = state.admin.pin;
   try {
-    const res = await generatePdf(pin);
+    const res = await generatePdf(state.admin.pin);
     const url = safeURL(res.url);
     if (!url) throw new Error('El servidor no devolvió el enlace del PDF.');
     pdf.result = { ...res, url, download: safeURL(res.download) || url };
@@ -832,39 +975,48 @@ window.addEventListener('beforeinstallprompt', (e) => {
 });
 
 // ── Eventos ───────────────────────────────────────────────────
+function onChip(e) {
+  const b = e.target.closest('.chip[data-field]');
+  if (!b) return;
+  const { field, value } = b.dataset;
+  state.filters[field] = value && state.filters[field] !== value ? value : null;
+  refreshList();
+  if (field === 'categoria') {
+    const on = $('#cats .chip[aria-pressed="true"]');
+    on && on.scrollIntoView({ inline: 'nearest', block: 'nearest' });
+  }
+}
+
 function bind() {
   const q = $('#q');
   let t;
   q.addEventListener('input', () => {
     $('#qClear').hidden = !q.value;
     clearTimeout(t);
-    t = setTimeout(() => { state.q = q.value; renderGrid(); }, 120);
+    t = setTimeout(() => { state.q = q.value; refreshList(); }, 120);
   });
-  $('#qClear').addEventListener('click', () => { q.value = ''; state.q = ''; $('#qClear').hidden = true; renderGrid(); q.focus(); });
+  $('#qClear').addEventListener('click', () => { q.value = ''; state.q = ''; $('#qClear').hidden = true; refreshList(); q.focus(); });
 
-  $('#filters').addEventListener('click', (e) => {
-    const b = e.target.closest('.chip');
-    if (!b) return;
-    const { field, value } = b.dataset;
-    state.filters[field] = value && state.filters[field] !== value ? value : null;
-    renderFilters();
-    renderGrid();
+  $('#cats').addEventListener('click', onChip);
+  $('#filterBody').addEventListener('click', onChip);
+  $('#filterBtn').addEventListener('click', () => { renderFilterSheet(); openSheet($('#filterSheet')); });
+  $('#filterClear').addEventListener('click', () => {
+    state.filters.genero = null; state.filters.marca = null; state.showSoldOut = false;
+    refreshList();
   });
+  $('#soldOut').addEventListener('change', (e) => { state.showSoldOut = e.target.checked; refreshList(); });
+  $('#clearAll').addEventListener('click', clearFilters);
 
   $('#refreshBtn').addEventListener('click', () => load({ user: true }));
   $('#content').addEventListener('click', (e) => {
-    const sell = e.target.closest('.sell-btn');
-    if (sell && !sell.disabled) { openSell(sell.dataset.key); return; }
+    const sb = e.target.closest('.sell-btn');
+    if (sb && !sb.disabled) { openSell(sb.dataset.card); return; }
     const v = e.target.closest('[data-void]');
     if (v && !v.disabled) { voidSale(v.dataset.void, v); return; }
     const act = e.target.closest('[data-act]')?.dataset.act;
     if (act === 'refresh') load({ user: true });
     if (act === 'reload-sales') loadSales({ force: true });
-    if (act === 'clear-filters') {
-      state.filters = { genero: null, categoria: null, marca: null };
-      state.q = ''; q.value = ''; $('#qClear').hidden = true;
-      renderFilters(); renderGrid();
-    }
+    if (act === 'clear-filters') clearFilters();
   });
 
   // Foto que no carga → marcador "AURA". (los errores de <img> no burbujean: usamos captura)
@@ -878,12 +1030,12 @@ function bind() {
   const menu = $('#menu');
   $('#menuBtn').addEventListener('click', () => openSheet(menu));
   menu.addEventListener('click', async (e) => {
-    if (e.target === menu) { menu.close(); return; } // toque fuera
     const act = e.target.closest('[data-act]')?.dataset.act;
     if (!act) return;
     menu.close();
     if (act === 'refresh') { state.view === 'sales' ? loadSales({ force: true }) : load({ user: true }); }
     if (act === 'update') checkForUpdate();
+    if (act === 'logout') logout();
     if (act === 'install' && installEvt) {
       installEvt.prompt();
       await installEvt.userChoice;
@@ -894,12 +1046,7 @@ function bind() {
   $('#versionNote').textContent = `Aura Catálogo · versión ${APP_VERSION}${MOCK ? ' · modo demo (PIN 1234)' : ''}`;
 
   // Admin
-  ['#loginSheet', '#sellSheet', '#confirmSheet', '#pdfSheet'].forEach((s) => wireSheet($(s)));
-  $('#pdfBtn').addEventListener('click', openPdf);
-  $('#pdfRetry').addEventListener('click', startPdf);
-  $('#pdfRegen').addEventListener('click', startPdf);
-  $('#pdfCopy').addEventListener('click', copyPdfLink);
-  $('#pdfShare').addEventListener('click', sharePdf);
+  ['#menu', '#filterSheet', '#loginSheet', '#sellSheet', '#confirmSheet', '#pdfSheet'].forEach((s) => wireSheet($(s)));
   $('#lockBtn').addEventListener('click', () => {
     showFormError($('#loginError'), '');
     $('#pin').value = '';
@@ -907,24 +1054,28 @@ function bind() {
     $('#pin').focus();
   });
   $('#loginForm').addEventListener('submit', login);
-  $('#logoutBtn').addEventListener('click', () => logout());
   $('#sellForm').addEventListener('submit', confirmSell);
-  $('#sellSheet').addEventListener('close', () => { if (!$('#sellSheet').dataset.busy) selling = null; });
-  $('.tabs').addEventListener('click', (e) => {
-    const b = e.target.closest('[data-view]');
-    if (b && b.dataset.view !== state.view) setView(b.dataset.view);
+  $('#sizeOpts').addEventListener('click', (e) => {
+    const b = e.target.closest('.size-opt');
+    if (!b || b.disabled) return;
+    sell.key = b.dataset.key;
+    sell.qty = 1;
+    showFormError($('#sellError'), '');
+    renderSellSheet();
   });
-  $('.tabs').addEventListener('keydown', (e) => {
-    if (e.key !== 'ArrowLeft' && e.key !== 'ArrowRight') return;
-    const next = state.view === 'catalog' ? 'sales' : 'catalog';
-    setView(next);
-    $(next === 'catalog' ? '#tabCatalog' : '#tabSales').focus();
+  $('#qtyMinus').addEventListener('click', () => { sell.qty--; renderSellSheet(); });
+  $('#qtyPlus').addEventListener('click', () => { sell.qty++; renderSellSheet(); });
+  $('#sellPrice').addEventListener('input', renderSellSheet);
+  $('#adminNav').addEventListener('click', (e) => {
+    const b = e.target.closest('button');
+    if (!b) return;
+    if (b.id === 'pdfBtn') { openPdf(); return; }
+    if (b.dataset.view && b.dataset.view !== state.view) setView(b.dataset.view);
   });
-  $('#soldOut').addEventListener('change', (e) => {
-    state.showSoldOut = e.target.checked;
-    renderFilters();
-    renderGrid();
-  });
+  $('#pdfRetry').addEventListener('click', startPdf);
+  $('#pdfRegen').addEventListener('click', startPdf);
+  $('#pdfCopy').addEventListener('click', copyPdfLink);
+  $('#pdfShare').addEventListener('click', sharePdf);
 
   // Buscador fijo: añade borde cuando se pega arriba
   const sb = $('.searchbar');
