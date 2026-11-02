@@ -2,386 +2,84 @@
 <html lang="es">
 <head>
 <meta charset="UTF-8">
-<meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>Catálogo Aura · Activewear</title>
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>Aura · Catálogo</title>
+<meta name="description" content="Catálogo de ropa deportiva Aura Activewear">
+<meta name="theme-color" content="#181512">
+<meta name="color-scheme" content="light">
+
+<!-- PWA / iPhone -->
+<link rel="manifest" href="./manifest.webmanifest">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+<meta name="apple-mobile-web-app-title" content="Aura">
+<link rel="apple-touch-icon" href="./icons/apple-touch-icon.png">
+<link rel="icon" type="image/png" sizes="32x32" href="./icons/favicon-32.png">
+
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-<link href="https://fonts.googleapis.com/css2?family=Cormorant+Garamond:wght@400;500;600&family=Inter:wght@300;400;500;600;700&display=swap" rel="stylesheet">
-<style>
-  *{box-sizing:border-box;margin:0;padding:0}
-  :root{
-    --bg:#faf7f2;--card:#fff;--ink:#1a1a1a;--soft:#555;--mute:#999;
-    --accent:#c97b63;--accent-soft:#f4e4dc;--line:#e8e0d6;
-    --green:#d8e4d4;--pink:#f4d4d4;--blue:#d4e0ed;
-  }
-  body{font-family:'Inter',sans-serif;background:var(--bg);color:var(--ink);min-height:100vh}
-
-  /* HERO */
-  .hero{background:linear-gradient(135deg,#1a1a1a 0%,#2d2620 100%);color:#faf7f2;padding:60px 24px 48px;text-align:center;position:relative;overflow:hidden}
-  .hero::before{content:"";position:absolute;top:-50%;left:-10%;width:60%;height:200%;background:radial-gradient(ellipse,rgba(201,123,99,.15) 0%,transparent 60%);pointer-events:none}
-  .hero-brand{font-family:'Cormorant Garamond',serif;font-size:64px;font-weight:500;letter-spacing:14px;margin-right:-14px}
-  .hero-tag{font-size:11px;letter-spacing:4px;text-transform:uppercase;color:#c97b63;margin:8px 0 32px}
-  .hero-stats{display:flex;justify-content:center;gap:48px;flex-wrap:wrap;position:relative}
-  .stat-n{font-family:'Cormorant Garamond',serif;font-size:36px;color:#c97b63;font-weight:600}
-  .stat-l{font-size:10px;letter-spacing:2px;text-transform:uppercase;color:#b5a89b}
-  .hero-update{margin-top:20px;font-size:11px;color:#6a5f58;letter-spacing:1px}
-
-  /* CONTROLS */
-  .container{max-width:1400px;margin:0 auto;padding:36px 20px 80px}
-  .controls{background:#fff;border-radius:16px;padding:22px;margin-bottom:28px;box-shadow:0 2px 16px rgba(0,0,0,.04)}
-  .search-row{display:flex;gap:10px;margin-bottom:18px;flex-wrap:wrap}
-  .search-input{flex:1;min-width:200px;border:1px solid var(--line);border-radius:10px;padding:11px 16px;font-size:15px;font-family:inherit;background:var(--bg);transition:.2s}
-  .search-input:focus{outline:none;border-color:var(--accent);background:#fff}
-  .clear-btn{background:var(--ink);color:#fff;border:none;border-radius:10px;padding:11px 20px;font-size:14px;font-family:inherit;cursor:pointer;white-space:nowrap}
-  .clear-btn:hover{background:var(--accent)}
-  .filter-group{margin-bottom:12px}
-  .filter-group:last-child{margin-bottom:0}
-  .filter-label{font-size:10px;letter-spacing:1.5px;text-transform:uppercase;color:var(--soft);margin-bottom:7px;display:block;font-weight:600}
-  .chips{display:flex;flex-wrap:wrap;gap:7px}
-  .chip{padding:6px 13px;border-radius:20px;background:var(--bg);border:1px solid var(--line);color:var(--soft);font-size:12px;cursor:pointer;transition:.2s;user-select:none}
-  .chip:hover{border-color:var(--accent)}
-  .chip.active{background:var(--ink);color:#fff;border-color:var(--ink)}
-
-  /* RESULTS */
-  .results-bar{display:flex;justify-content:space-between;align-items:baseline;margin-bottom:20px;padding:0 4px}
-  .results-count{font-size:13px;color:var(--soft)}
-  .results-count strong{color:var(--ink)}
-  .loading-msg{text-align:center;padding:80px 20px;color:var(--mute);font-size:15px}
-  .error-msg{text-align:center;padding:60px 20px;color:#c44;font-size:14px;background:#fff;border-radius:12px;margin:20px 0}
-
-  /* GRID */
-  .grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(250px,1fr));gap:20px}
-  .card{background:var(--card);border-radius:14px;overflow:hidden;cursor:pointer;transition:transform .25s,box-shadow .25s;display:flex;flex-direction:column}
-  .card:hover{transform:translateY(-4px);box-shadow:0 8px 32px rgba(0,0,0,.08)}
-  .card-img-wrap{width:100%;aspect-ratio:3/4;background:linear-gradient(135deg,#f4ebe1,#ede0d2);position:relative;overflow:hidden}
-  .card-img-wrap img{width:100%;height:100%;object-fit:cover;transition:transform .4s}
-  .card:hover .card-img-wrap img{transform:scale(1.04)}
-  .img-fallback{position:absolute;inset:0;display:flex;align-items:center;justify-content:center;color:var(--mute);font-family:'Cormorant Garamond',serif;font-size:18px;letter-spacing:4px}
-  .gender-badge{position:absolute;top:10px;left:10px;padding:3px 9px;border-radius:10px;font-size:9px;font-weight:700;letter-spacing:1px;text-transform:uppercase;backdrop-filter:blur(8px)}
-  .badge-mujer{background:rgba(244,212,212,.95);color:#884444}
-  .badge-hombre{background:rgba(212,224,237,.95);color:#2c4863}
-  .badge-unisex{background:rgba(216,228,212,.95);color:#3d5c3d}
-  .stock-ribbon{position:absolute;top:10px;right:10px;background:rgba(26,26,26,.75);color:#fff;padding:3px 8px;border-radius:8px;font-size:9px;font-weight:600;letter-spacing:.5px}
-  .stock-ribbon.low{background:rgba(200,100,30,.85)}
-
-  .card-body{padding:14px 16px 18px;display:flex;flex-direction:column;flex:1}
-  .card-brand{font-size:9px;font-weight:700;letter-spacing:2px;text-transform:uppercase;color:var(--accent);margin-bottom:5px}
-  .card-name{font-size:14px;font-weight:500;line-height:1.35;min-height:38px;margin-bottom:10px}
-  .card-meta{display:flex;align-items:center;gap:6px;font-size:11px;color:var(--soft);margin-bottom:10px}
-  .color-dot{width:11px;height:11px;border-radius:50%;border:1px solid rgba(0,0,0,.1);flex-shrink:0}
-  .sizes{display:flex;gap:4px;flex-wrap:wrap;margin-bottom:12px}
-  .size-pill{padding:2px 7px;background:var(--bg);border:1px solid var(--line);border-radius:5px;font-size:10px;font-weight:700;color:var(--soft)}
-  .card-footer{display:flex;justify-content:space-between;align-items:center;margin-top:auto;padding-top:11px;border-top:1px solid var(--line)}
-  .price{font-family:'Cormorant Garamond',serif;font-size:26px;font-weight:600}
-  .price::before{content:"$";font-size:13px;vertical-align:super;color:var(--accent);margin-right:1px}
-  .avail-tag{font-size:10px;padding:2px 8px;border-radius:8px;font-weight:600}
-  .avail-ok{background:var(--green);color:#3d5c3d}
-  .avail-low{background:#fde8d4;color:#8a5a2a}
-
-  /* MODAL */
-  .modal-bg{display:none;position:fixed;inset:0;background:rgba(0,0,0,.6);z-index:100;align-items:center;justify-content:center;padding:16px;backdrop-filter:blur(4px)}
-  .modal-bg.show{display:flex}
-  .modal{background:var(--card);border-radius:18px;max-width:800px;width:100%;max-height:92vh;overflow-y:auto;display:grid;grid-template-columns:1fr 1fr}
-  .modal-img{background:var(--accent-soft);overflow:hidden}
-  .modal-img img{width:100%;height:100%;object-fit:cover;display:block}
-  .modal-body{padding:36px 28px;position:relative}
-  .modal-close{position:absolute;top:14px;right:14px;width:30px;height:30px;border-radius:50%;background:var(--bg);border:none;font-size:18px;cursor:pointer;color:var(--soft);line-height:30px;text-align:center}
-  .modal-brand{font-size:10px;font-weight:700;letter-spacing:3px;text-transform:uppercase;color:var(--accent);margin-bottom:6px}
-  .modal-name{font-family:'Cormorant Garamond',serif;font-size:28px;font-weight:500;line-height:1.2;margin-bottom:6px}
-  .modal-price{font-family:'Cormorant Garamond',serif;font-size:34px;font-weight:600;margin-bottom:22px}
-  .modal-price::before{content:"$";font-size:16px;vertical-align:super;color:var(--accent)}
-  .modal-row{display:flex;justify-content:space-between;padding:9px 0;border-bottom:1px solid var(--line);font-size:13px}
-  .modal-row span:first-child{color:var(--soft);text-transform:uppercase;font-size:10px;letter-spacing:1px}
-  .modal-desc{margin-top:18px;font-size:13px;color:var(--soft);line-height:1.7}
-
-  /* FOOTER */
-  .foot{text-align:center;margin-top:60px;padding-top:28px;border-top:1px solid var(--line);color:var(--mute);font-size:11px;letter-spacing:2px}
-
-  @media(max-width:660px){
-    .hero-brand{font-size:44px;letter-spacing:10px}
-    .hero-stats{gap:28px}
-    .modal{grid-template-columns:1fr}
-    .modal-img{aspect-ratio:1}
-  }
-</style>
+<link href="https://fonts.googleapis.com/css2?family=Cormorant+Garamond:wght@500;600;700&family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="./styles.css">
+<script type="module" src="./app.js"></script>
 </head>
 <body>
+<a class="skip" href="#content">Saltar al catálogo</a>
 
-<div class="hero">
-  <div class="hero-brand">AURA</div>
-  <div class="hero-tag">Activewear · Catálogo</div>
-  <div class="hero-stats">
-    <div><div class="stat-n" id="statProducts">—</div><div class="stat-l">Modelos</div></div>
-    <div><div class="stat-n" id="statUnits">—</div><div class="stat-l">Disponibles</div></div>
-    <div><div class="stat-n" id="statBrands">—</div><div class="stat-l">Marcas</div></div>
+<header class="hero">
+  <div class="hero-top">
+    <span class="demo-badge" id="demoBadge" hidden>Demo</span>
+    <button class="icon-btn" id="menuBtn" type="button" aria-label="Menú" aria-haspopup="dialog">
+      <svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="5" cy="12" r="2"/><circle cx="12" cy="12" r="2"/><circle cx="19" cy="12" r="2"/></svg>
+    </button>
   </div>
-  <div class="hero-update" id="updateTime"></div>
+  <h1 class="logo">AURA</h1>
+  <div class="logo-line" aria-hidden="true"></div>
+  <p class="logo-sub">Activewear · Catálogo</p>
+  <dl class="stats" aria-label="Resumen del catálogo">
+    <div><dt>Modelos</dt><dd id="stModels">–</dd></div>
+    <div><dt>Unidades</dt><dd id="stUnits">–</dd></div>
+    <div><dt>Marcas</dt><dd id="stBrands">–</dd></div>
+  </dl>
+</header>
+
+<div class="banner" id="banner" role="status" hidden></div>
+
+<div class="searchbar">
+  <label class="search">
+    <svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="11" cy="11" r="7"/><path d="m20 20-3.5-3.5"/></svg>
+    <span class="sr-only">Buscar</span>
+    <input id="q" type="search" placeholder="Buscar producto, marca o color" autocomplete="off" enterkeyhint="search">
+    <button class="clear" id="qClear" type="button" aria-label="Borrar búsqueda" hidden>×</button>
+  </label>
 </div>
 
-<div class="container">
-  <div class="controls">
-    <div class="search-row">
-      <input type="text" class="search-input" id="searchInput" placeholder="Buscar por nombre, color, marca…">
-      <button class="clear-btn" onclick="clearFilters()">Limpiar filtros</button>
-    </div>
-    <div class="filter-group">
-      <label class="filter-label">Género</label>
-      <div class="chips" id="genderChips"></div>
-    </div>
-    <div class="filter-group">
-      <label class="filter-label">Categoría</label>
-      <div class="chips" id="catChips"></div>
-    </div>
-    <div class="filter-group">
-      <label class="filter-label">Marca</label>
-      <div class="chips" id="brandChips"></div>
-    </div>
-  </div>
+<nav class="filters" id="filters" aria-label="Filtros"></nav>
 
-  <div class="results-bar">
-    <div class="results-count">Mostrando <strong id="visibleCount">—</strong> productos</div>
-  </div>
-
-  <div id="grid" class="grid">
-    <div class="loading-msg">⏳ Cargando inventario desde Google Sheets…</div>
-  </div>
-
-  <div class="foot">AURA · ACTIVEWEAR · 2026</div>
+<div class="meta">
+  <span id="count" aria-live="polite"></span>
+  <span class="meta-right">
+    <span id="updated"></span>
+    <button class="refresh" id="refreshBtn" type="button" aria-label="Actualizar catálogo">
+      <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M20 11a8 8 0 1 0-2.3 5.7"/><path d="M20 4v7h-7"/></svg>
+    </button>
+  </span>
 </div>
 
-<div class="modal-bg" id="modalBg" onclick="if(event.target===this)closeModal()">
-  <div class="modal" id="modal"></div>
-</div>
+<main id="content" tabindex="-1"></main>
 
-<script>
-// ─── CONFIG ──────────────────────────────────────────────────────────────────
-const CSV_URL = 'https://docs.google.com/spreadsheets/d/e/2PACX-1vQoGmoKWLvCQsgBMEVQtbR0zdojWBYFjx6wgKWUUsXXHOLMLUDJyLKM8KS17OZidhuNg2acqPHpf0-T/pub?gid=0&single=true&output=csv';
+<footer class="foot">AURA · ACTIVEWEAR</footer>
 
-// ─── COLORS ──────────────────────────────────────────────────────────────────
-const COLOR_MAP = {
-  'blanco':'#f0ede8','negro':'#1a1a1a','gris':'#a0a0a0','gris oscuro':'#5a5a5a',
-  'azul':'#3b66a8','azul marino':'#1a2845','azul claro':'#a8c4e0',
-  'azul jaspeado':'#5a7eb0','azul oscuro':'#1f2f4d','azul turquesa profundo':'#0d6477',
-  'rosa':'#f4b8c1','lila':'#c8a5d4','morado':'#6b4583','lavanda':'#b8a8d4',
-  'verde':'#5b8a4a','verde oliva':'#7d8c4f','verde militar':'#54624e',
-  'verde menta':'#a8d8c4','verde petróleo':'#2d5a5c',
-  'beige':'#d8c9ad','marrón':'#7a5544','mostaza':'#c8a232','vino':'#722f3a'
-};
-function colorDot(c){ return COLOR_MAP[(c||'').toLowerCase()] || '#c9b'; }
-function imgUrl(id){ return `https://drive.google.com/thumbnail?id=${id}&sz=w600`; }
+<dialog class="sheet" id="menu" aria-labelledby="menuTitle">
+  <div class="sheet-grip" aria-hidden="true"></div>
+  <h2 id="menuTitle" class="sheet-title">Menú</h2>
+  <button class="sheet-item" type="button" data-act="refresh">Actualizar catálogo</button>
+  <button class="sheet-item" type="button" data-act="update">Buscar actualización de la app</button>
+  <button class="sheet-item" type="button" data-act="install" id="installItem" hidden>Instalar app</button>
+  <p class="sheet-note" id="versionNote"></p>
+  <button class="btn btn-ghost" type="button" data-act="close">Cerrar</button>
+</dialog>
 
-// ─── PARSE CSV ────────────────────────────────────────────────────────────────
-function parseCSV(text){
-  const lines = text.trim().split('\n');
-  const headers = splitCSVLine(lines[0]);
-  return lines.slice(1).map(line => {
-    const vals = splitCSVLine(line);
-    const obj = {};
-    headers.forEach((h,i) => obj[h.trim()] = (vals[i]||'').trim());
-    return obj;
-  });
-}
-
-function splitCSVLine(line){
-  const out=[]; let cur='', inQ=false;
-  for(let i=0;i<line.length;i++){
-    const c=line[i];
-    if(c==='"'){ if(inQ && line[i+1]==='"'){cur+='"';i++;}else inQ=!inQ; }
-    else if(c===',' && !inQ){ out.push(cur);cur=''; }
-    else cur+=c;
-  }
-  out.push(cur);
-  return out;
-}
-
-function fileId(url){
-  const m = (url||'').match(/\/file\/d\/([^/]+)\//);
-  return m?m[1]:null;
-}
-
-// ─── BUILD PRODUCTS ───────────────────────────────────────────────────────────
-// Logic: disponible = Stock - VENDIDA  →  skip if disponible <= 0
-function buildProducts(rows){
-  const map={};
-  const sizeOrder={XS:0,S:1,M:2,L:3,XL:4,XXL:5,XXXL:6};
-
-  rows.forEach(r => {
-    const fid = fileId(r.driveLink);
-    if(!fid) return;
-
-    const stock    = parseInt(r.Stock)||0;
-    const vendida  = parseInt(r.VENDIDA)||0;
-    const disponible = stock - vendida;
-    if(disponible <= 0) return;   // sold out → skip
-
-    const precio = parseFloat(r.Precio)||0;
-    const key = fid+'|'+r.Nombre+'|'+r.Color;
-
-    if(!map[key]){
-      map[key]={
-        fileId:fid, nombre:r.Nombre, marca:r.Marca,
-        categoria:r.Categoria, color:r.Color, genero:r.Genero,
-        precio, descripcion:r.Descripcion,
-        tallas:[], disponible:0, codigos:[]
-      };
-    }
-    const p = map[key];
-    if(r.Talla && !p.tallas.includes(r.Talla)) p.tallas.push(r.Talla);
-    p.disponible += disponible;
-    if(r.Codigo && !p.codigos.includes(r.Codigo)) p.codigos.push(r.Codigo);
-    // use latest price from sheet
-    p.precio = precio;
-  });
-
-  const list = Object.values(map);
-  list.forEach(p => p.tallas.sort((a,b)=>(sizeOrder[a]??99)-(sizeOrder[b]??99)));
-  // sort: Mujer→Hombre→Unisex, then category, brand
-  const gOrd={Mujer:0,Hombre:1,Unisex:2};
-  list.sort((a,b)=>(gOrd[a.genero]??9)-(gOrd[b.genero]??9)||a.categoria.localeCompare(b.categoria)||a.marca.localeCompare(b.marca));
-  return list;
-}
-
-// ─── STATE ────────────────────────────────────────────────────────────────────
-let ALL=[], activeGender='todos', activeCat='todos', activeBrand='todos', activeSearch='';
-
-function filtered(){
-  return ALL.filter(p=>{
-    if(activeGender!=='todos' && p.genero!==activeGender) return false;
-    if(activeCat!=='todos'    && p.categoria!==activeCat) return false;
-    if(activeBrand!=='todos'  && p.marca!==activeBrand)   return false;
-    if(activeSearch){
-      const s=(p.nombre+' '+p.color+' '+p.marca+' '+p.categoria+' '+p.codigos.join(' ')).toLowerCase();
-      if(!s.includes(activeSearch)) return false;
-    }
-    return true;
-  });
-}
-
-// ─── RENDER CHIPS ─────────────────────────────────────────────────────────────
-function chip(val, active, fn){
-  return `<div class="chip ${val===active?'active':''}" onclick="${fn}('${val.replace(/'/g,"\\'")}')">${val==='todos'?'Todos':val}</div>`;
-}
-function renderChips(){
-  const gen=['todos',...[...new Set(ALL.map(p=>p.genero))]];
-  const cats=['todos',...[...new Set(ALL.map(p=>p.categoria))].sort()];
-  const brands=['todos',...[...new Set(ALL.map(p=>p.marca))].sort()];
-  document.getElementById('genderChips').innerHTML=gen.map(v=>chip(v,activeGender,'setGender')).join('');
-  document.getElementById('catChips').innerHTML=cats.map(v=>chip(v,activeCat,'setCat')).join('');
-  document.getElementById('brandChips').innerHTML=brands.map(v=>chip(v,activeBrand,'setBrand')).join('');
-}
-function setGender(v){activeGender=v;renderChips();renderGrid();}
-function setCat(v){activeCat=v;renderChips();renderGrid();}
-function setBrand(v){activeBrand=v;renderChips();renderGrid();}
-function clearFilters(){activeGender=activeCat=activeBrand='todos';activeSearch='';document.getElementById('searchInput').value='';renderChips();renderGrid();}
-document.getElementById('searchInput').addEventListener('input',e=>{activeSearch=e.target.value.toLowerCase().trim();renderGrid();});
-
-// ─── RENDER GRID ──────────────────────────────────────────────────────────────
-function availTag(n){
-  if(n===1) return `<div class="avail-tag avail-low">Última unidad</div>`;
-  return `<div class="avail-tag avail-ok">${n} disponibles</div>`;
-}
-function genderClass(g){ return 'badge-'+(g||'').toLowerCase(); }
-
-function renderGrid(){
-  const list=filtered();
-  document.getElementById('visibleCount').textContent=list.length;
-  const grid=document.getElementById('grid');
-  if(!list.length){
-    grid.innerHTML='<div class="loading-msg">No hay productos con esos filtros.</div>';
-    return;
-  }
-  grid.innerHTML=list.map(p=>`
-    <div class="card" onclick="openModal('${p.fileId}|${p.nombre.replace(/'/g,"\\'")}|${p.color.replace(/'/g,"\\'")}')">
-      <div class="card-img-wrap">
-        <div class="img-fallback">AURA</div>
-        <img src="${imgUrl(p.fileId)}" alt="${p.nombre}" loading="lazy"
-             onload="this.previousElementSibling.style.display='none'"
-             onerror="this.style.display='none'">
-        <div class="gender-badge ${genderClass(p.genero)}">${p.genero}</div>
-        ${p.disponible===1?'<div class="stock-ribbon low">Última unidad</div>':p.disponible<=3?`<div class="stock-ribbon low">${p.disponible} disponibles</div>`:''}
-      </div>
-      <div class="card-body">
-        <div class="card-brand">${p.marca}</div>
-        <div class="card-name">${p.nombre}</div>
-        <div class="card-meta">
-          <span class="color-dot" style="background:${colorDot(p.color)}"></span>
-          <span>${p.color}</span>
-        </div>
-        <div class="sizes">${p.tallas.map(t=>`<span class="size-pill">${t}</span>`).join('')}</div>
-        <div class="card-footer">
-          <div class="price">${p.precio.toFixed(2)}</div>
-          ${availTag(p.disponible)}
-        </div>
-      </div>
-    </div>
-  `).join('');
-}
-
-// ─── MODAL ───────────────────────────────────────────────────────────────────
-function openModal(key){
-  const [fid,...rest]=key.split('|');
-  // reconstruct name|color since they may contain |
-  const nombre=rest.slice(0,-1).join('|'), color=rest[rest.length-1];
-  const p=ALL.find(x=>x.fileId===fid && x.nombre===nombre && x.color===color);
-  if(!p) return;
-  document.getElementById('modal').innerHTML=`
-    <div class="modal-img"><img src="${imgUrl(p.fileId)}" alt="${p.nombre}"></div>
-    <div class="modal-body">
-      <button class="modal-close" onclick="closeModal()">×</button>
-      <div class="modal-brand">${p.marca}</div>
-      <div class="modal-name">${p.nombre}</div>
-      <div class="modal-price">${p.precio.toFixed(2)}</div>
-      <div class="modal-row"><span>Categoría</span><span>${p.categoria}</span></div>
-      <div class="modal-row"><span>Género</span><span>${p.genero}</span></div>
-      <div class="modal-row"><span>Color</span><span>${p.color}</span></div>
-      <div class="modal-row"><span>Tallas</span><span>${p.tallas.join(' · ')||'—'}</span></div>
-      <div class="modal-row"><span>Disponible</span><span><strong>${p.disponible} unidad${p.disponible!==1?'es':''}</strong></span></div>
-      ${p.codigos.length?`<div class="modal-row"><span>Código</span><span style="font-size:11px">${p.codigos.join(', ')}</span></div>`:''}
-      ${p.descripcion?`<div class="modal-desc">${p.descripcion}</div>`:''}
-    </div>`;
-  document.getElementById('modalBg').classList.add('show');
-}
-function closeModal(){document.getElementById('modalBg').classList.remove('show');}
-document.addEventListener('keydown',e=>{if(e.key==='Escape')closeModal();});
-
-// ─── LOAD DATA ────────────────────────────────────────────────────────────────
-function updateHeroStats(){
-  const units=ALL.reduce((s,p)=>s+p.disponible,0);
-  const brands=new Set(ALL.map(p=>p.marca)).size;
-  document.getElementById('statProducts').textContent=ALL.length;
-  document.getElementById('statUnits').textContent=units;
-  document.getElementById('statBrands').textContent=brands;
-  const now=new Date();
-  document.getElementById('updateTime').textContent=
-    `Actualizado: ${now.toLocaleDateString('es-VE')} ${now.toLocaleTimeString('es-VE',{hour:'2-digit',minute:'2-digit'})}`;
-}
-
-async function loadSheet(){
-  document.getElementById('grid').innerHTML='<div class="loading-msg">⏳ Cargando inventario…</div>';
-  try{
-    // Use CORS proxy approach via Google's own export
-    const url=CSV_URL;
-    const res=await fetch(url);
-    if(!res.ok) throw new Error(`HTTP ${res.status}`);
-    const text=await res.text();
-    const rows=parseCSV(text);
-    ALL=buildProducts(rows);
-    updateHeroStats();
-    renderChips();
-    renderGrid();
-  } catch(err){
-    console.error(err);
-    document.getElementById('grid').innerHTML=`
-      <div class="error-msg">
-        ⚠️ No se pudo cargar el inventario.<br><br>
-        Asegúrate de que el Google Sheet esté publicado:<br>
-        <strong>Archivo → Compartir → Publicar en la web → Publicar</strong><br><br>
-        <small style="color:#999">${err.message}</small>
-      </div>`;
-  }
-}
-
-loadSheet();
-</script>
+<div class="toasts" id="toasts" aria-live="polite"></div>
 </body>
 </html>
