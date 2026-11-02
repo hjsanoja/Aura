@@ -186,7 +186,57 @@ const bad = plan.reqs.filter((r) => (r.updateTextStyle && r.updateTextStyle.text
 check('Slides: rangos de texto válidos', bad.length === 0, String(bad.length));
 const ids = plan.reqs.map((r) => (r.createShape || r.createSlide || {}).objectId).filter(Boolean);
 check('Slides: IDs únicos y válidos', new Set(ids).size === ids.length && ids.every((x) => /^[a-zA-Z0-9_]{5,50}$/.test(x)));
-check('Slides: insígnias de género por encima de la foto', plan.front.length === cards.length);
+const pageOf = {};
+plan.reqs.forEach((r) => { if (r.createShape) pageOf[r.createShape.objectId] = r.createShape.elementProperties.pageObjectId; });
+const fronts = Object.entries(plan.front);
+check('Slides: etiquetas de género delante de la foto (todas)', fronts.reduce((n, [, ids]) => n + ids.length, 0) === cards.length);
+check('Slides: un pedido de orden por página (todos sus elementos en esa página)', fronts.every(([sid, ids]) => ids.every((id) => pageOf[id] === sid)));
+// ── PDF de punta a punta con un Google Slides simulado que aplica las reglas reales ──
+{
+  const e2 = makeEnv();
+  const pageOf = {};
+  const slides = [];
+  const errors = [];
+  let calls = 0;
+  const VALID = ['createSlide', 'updatePageProperties', 'createShape', 'updateShapeProperties', 'insertText', 'updateTextStyle', 'updateParagraphStyle', 'deleteObject', 'updatePageElementsZOrder'];
+  e2.ctx.Slides = {
+    Presentations: {
+      create: () => ({ presentationId: 'PRES_1' }),
+      get: () => ({ pageSize: { width: { magnitude: 7560000, unit: 'EMU' }, height: { magnitude: 10692000, unit: 'EMU' } }, slides: [{ objectId: 'p_default' }] }),
+      batchUpdate: (body) => {
+        calls++;
+        body.requests.forEach((r, i) => {
+          const type = Object.keys(r)[0];
+          if (!VALID.includes(type)) errors.push(`requests[${i}] tipo desconocido ${type}`);
+          if (r.createSlide) { slides.push(r.createSlide.objectId); pageOf[r.createSlide.objectId] = r.createSlide.objectId; }
+          if (r.createShape) {
+            const id = r.createShape.objectId;
+            if (!/^[a-zA-Z0-9_]{5,50}$/.test(id)) errors.push(`ID no válido ${id}`);
+            pageOf[id] = r.createShape.elementProperties.pageObjectId;
+          }
+          if (r.updatePageElementsZOrder) {
+            const pages = new Set(r.updatePageElementsZOrder.pageElementObjectIds.map((x) => pageOf[x]));
+            if (pages.size !== 1) errors.push(`requests[${i}].updatePageElementsZOrder: All page elements should be on the same page.`);
+          }
+        });
+        if (errors.length) throw new Error(errors[0]);
+        return {};
+      },
+    },
+  };
+  let images = 0;
+  e2.ctx.SlidesApp = { openById: () => ({ getSlides: () => slides.map((id) => ({ getObjectId: () => id, insertImage: () => { images++; } })), saveAndClose() {} }) };
+  const file = { getUrl: () => 'https://drive.google.com/file/d/PDF_1/view', getId: () => 'PDF_1', setSharing() {} };
+  e2.ctx.DriveApp = {
+    Access: { ANYONE_WITH_LINK: 1 }, Permission: { VIEW: 1 },
+    getFileById: (id) => ({ getAs: () => ({ setName() { return this; } }), setTrashed() {}, getBlob: () => ({ getBytes: () => Buffer.from('x'), getContentType: () => 'image/jpeg' }) }),
+    getFoldersByName: () => ({ hasNext: () => true, next: () => ({ getFilesByName: () => ({ hasNext: () => false }), createFile: () => file }) }),
+  };
+  let res, err = null;
+  try { res = e2.ctx.apiPdf_(); } catch (e) { err = e.message; }
+  check('PDF de punta a punta: sin errores de la API de Slides', !err, err || '');
+  check('PDF de punta a punta: A4 vertical, fotos y enlace', !!res && res.formato === 'A4 vertical' && res.version === 2 && images === cards.length && res.url.includes('PDF_1'), res ? `${res.pages} págs, ${images} fotos, ${calls} llamadas` : '');
+}
 fs.writeFileSync(path.join(OUT, 'pdf-plan.json'), JSON.stringify({ W: ctx.PDF_.W, H: ctx.PDF_.H, pages }, null, 1));
 
 // ── 3) Vista previa del PDF (aprox. a como lo dibuja Slides) ──
