@@ -674,7 +674,7 @@ function slideRequests_(pages, scale) {
   const k = scale && Math.abs(scale - 1) > 0.01 ? scale : 1;
   const reqs = [];
   const images = [];
-  const front = [];
+  const front = {};   // por página: Slides exige un pedido de orden (z) por página
   let n = 0;
   const id = (p) => 'aura_' + p + '_' + (++n);
   const size = (w, h) => ({ width: { magnitude: Math.max(0.5, w * k), unit: 'PT' }, height: { magnitude: Math.max(0.5, h * k), unit: 'PT' } });
@@ -705,7 +705,7 @@ function slideRequests_(pages, scale) {
       }
       if (e.t === 'text') { props.contentAlignment = e.valign || 'TOP'; fields.push('contentAlignment'); }
       reqs.push({ updateShapeProperties: { objectId: oid, shapeProperties: props, fields: fields.join(',') } });
-      if (e.front) front.push(oid);
+      if (e.front) (front[sid] = front[sid] || []).push(oid);
       if (e.t !== 'text') return;
       e.paragraphs.forEach((p) => { if (!p.runs.some((r) => r.text.length)) p.runs = [Object.assign({}, p.runs[0] || run_('', 8, '#000000'), { text: ' ' })]; });
       const text = e.paragraphs.map((p) => p.runs.map((r) => r.text).join('')).join('\n');
@@ -781,8 +781,10 @@ function renderPdf_(pages, name) {
         try { bySlide[im.slide].insertImage(blob, im.x, im.y, im.w, im.h); } catch (e) { /* foto no disponible: queda el marco */ }
       });
       deck.saveAndClose();
-      if (plan.front.length) {
-        Slides.Presentations.batchUpdate({ requests: [{ updatePageElementsZOrder: { pageElementObjectIds: plan.front, operation: 'BRING_TO_FRONT' } }] }, presId);
+      const zReqs = Object.keys(plan.front).map((sid) => ({ updatePageElementsZOrder: { pageElementObjectIds: plan.front[sid], operation: 'BRING_TO_FRONT' } }));
+      if (zReqs.length) {
+        try { Slides.Presentations.batchUpdate({ requests: zReqs }, presId); }
+        catch (e) { /* si falla, la etiqueta de género queda detrás de la foto, pero el PDF sale igual */ }
       }
     }
     const pdf = DriveApp.getFileById(presId).getAs('application/pdf').setName(name);
