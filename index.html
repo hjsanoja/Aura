@@ -55,6 +55,10 @@
     <button type="button" role="tab" id="tabCatalog" data-view="catalog" aria-selected="true" aria-controls="content">Catálogo</button>
     <button type="button" role="tab" id="tabSales" data-view="sales" aria-selected="false" aria-controls="content">Ventas</button>
   </div>
+  <button type="button" class="pdf-btn" id="pdfBtn" aria-haspopup="dialog">
+    <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M14 3H7a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h10a2 2 0 0 0 2-2V8z"/><path d="M14 3v5h5"/><path d="M12 18v-6"/><path d="m9 15 3 3 3-3"/></svg>
+    <span id="pdfBtnText">Compartir PDF</span>
+  </button>
   <label class="switch" id="soldOutWrap">
     <input type="checkbox" id="soldOut" role="switch">
     <span class="track" aria-hidden="true"></span>
@@ -130,6 +134,41 @@
     <button class="btn" type="submit" id="sellSubmit">Confirmar venta</button>
     <button class="btn btn-ghost" type="button" data-close>Cancelar</button>
   </form>
+</dialog>
+
+<dialog class="sheet" id="pdfSheet" aria-labelledby="pdfTitle">
+  <div class="sheet-grip" aria-hidden="true"></div>
+  <h2 id="pdfTitle" class="sheet-title">Catálogo en PDF</h2>
+
+  <div id="pdfWorking" class="pdf-working" hidden>
+    <div class="pdf-spinner" aria-hidden="true"></div>
+    <p class="pdf-msg" role="status">Generando catálogo… puede tardar hasta 1 minuto</p>
+    <div class="pdf-bar" aria-hidden="true"><span></span></div>
+    <p class="sheet-note" id="pdfElapsed"></p>
+    <p class="sheet-note">Puedes cerrar esta ventana: te aviso cuando esté listo.</p>
+  </div>
+
+  <div id="pdfDone" hidden>
+    <div class="pdf-file">
+      <div class="pdf-icon" aria-hidden="true">PDF</div>
+      <div><b id="pdfName"></b><span id="pdfMeta"></span></div>
+    </div>
+    <div class="pdf-actions">
+      <button class="btn" type="button" id="pdfShare" hidden>Compartir…</button>
+      <a class="btn btn-ghost" id="pdfOpen" target="_blank" rel="noopener">Abrir PDF</a>
+      <a class="btn btn-ghost" id="pdfDownload" target="_blank" rel="noopener">Descargar</a>
+      <button class="btn btn-ghost" type="button" id="pdfCopy">Copiar enlace</button>
+    </div>
+    <p class="pdf-status" id="pdfStatus" role="status" aria-live="polite"></p>
+    <button class="link-btn" type="button" id="pdfRegen">Generar de nuevo</button>
+  </div>
+
+  <div id="pdfFail" hidden>
+    <p class="form-error" id="pdfError" role="alert"></p>
+    <button class="btn" type="button" id="pdfRetry">Reintentar</button>
+  </div>
+
+  <button class="btn btn-ghost" type="button" data-close id="pdfClose">Cerrar</button>
 </dialog>
 
 <dialog class="sheet" id="confirmSheet" aria-labelledby="confirmTitle">

@@ -1,8 +1,9 @@
 // Aura Catálogo — lógica principal
 // Fase 1: catálogo de solo lectura · Fase 2: modo admin (vender, deshacer, ventas, agotados)
-import { getCatalog, post, isConfigured, MOCK } from './api.js';
+// Fase 3: compartir el catálogo en PDF
+import { getCatalog, post, generatePdf, isConfigured, MOCK } from './api.js';
 
-export const APP_VERSION = '1.1.0';
+export const APP_VERSION = '1.2.0';
 const STORE_KEY = MOCK ? 'aura.catalog.mock.v1' : 'aura.catalog.v1';
 const ADMIN_STORE_KEY = MOCK ? 'aura.admin.mock.v1' : 'aura.admin.v1';
 const SESSION_KEY = MOCK ? 'aura.session.mock.v1' : 'aura.session.v1';
@@ -433,6 +434,9 @@ async function login(e) {
 function logout({ silent = false } = {}) {
   state.admin = null;
   state.sales = null;
+  pdf.result = null;
+  pdf.error = null;
+  closeSheet($('#pdfSheet'));
   state.showSoldOut = false;
   $('#soldOut').checked = false;
   storage.del(SESSION_KEY);
@@ -623,6 +627,154 @@ async function voidSale(id, btn) {
   renderSales();
 }
 
+// ── Compartir PDF ─────────────────────────────────────────────
+const pdf = { busy: false, result: null, at: null, error: null, started: 0, timer: null };
+const PDF_SHARE_TEXT = 'Catálogo Aura actualizado';
+
+function safeURL(u) {
+  try {
+    const x = new URL(u, location.href);
+    return x.protocol === 'https:' || x.protocol === 'http:' ? x.href : '';
+  } catch { return ''; }
+}
+
+function pdfView(which) {
+  ['#pdfWorking', '#pdfDone', '#pdfFail'].forEach((s) => { $(s).hidden = s !== which; });
+}
+
+function setPdfStatus(msg, error = false) {
+  const el = $('#pdfStatus');
+  el.textContent = msg;
+  el.classList.toggle('err', error);
+}
+
+function renderPdfSheet() {
+  if (pdf.busy) {
+    pdfView('#pdfWorking');
+    $('#pdfClose').textContent = 'Cerrar (sigue generando)';
+    tickPdf();
+    return;
+  }
+  $('#pdfClose').textContent = 'Cerrar';
+  if (pdf.error) {
+    $('#pdfError').textContent = pdf.error;
+    pdfView('#pdfFail');
+    return;
+  }
+  if (!pdf.result) return;
+  const r = pdf.result;
+  const n = (v, one, many) => (v === undefined || v === null || v === '' ? '' : `${v} ${Number(v) === 1 ? one : many}`);
+  $('#pdfName').textContent = r.name || 'Catálogo Aura.pdf';
+  $('#pdfMeta').textContent = [n(r.pages, 'página', 'páginas'), n(r.models, 'modelo', 'modelos'), n(r.units, 'unidad', 'unidades'), `generado ${timeAgo(pdf.at)}`].filter(Boolean).join(' · ');
+  $('#pdfOpen').href = r.url;
+  $('#pdfDownload').href = r.download || r.url;
+  $('#pdfShare').hidden = typeof navigator.share !== 'function';
+  setPdfStatus('');
+  pdfView('#pdfDone');
+}
+
+function tickPdf() {
+  const secs = Math.round((Date.now() - pdf.started) / 1000);
+  $('#pdfElapsed').textContent = secs > 0 ? `Llevamos ${secs} s` : '';
+  // Barra orientativa: llega al 95 % en ~60 s y espera ahí.
+  $('#pdfWorking .pdf-bar span').style.width = `${Math.min(95, (secs / 60) * 95)}%`;
+}
+
+function setPdfButton(busy) {
+  const b = $('#pdfBtn');
+  b.setAttribute('aria-busy', String(busy));
+  $('#pdfBtnText').textContent = busy ? 'Generando PDF…' : 'Compartir PDF';
+}
+
+function openPdf() {
+  if (!state.admin) return;
+  if (pdf.busy || pdf.result || pdf.error) {
+    renderPdfSheet();
+    openSheet($('#pdfSheet'));
+    return;
+  }
+  startPdf();
+}
+
+async function startPdf() {
+  if (pdf.busy || !state.admin) return; // evita doble clic mientras genera
+  const sheet = $('#pdfSheet');
+  pdf.result = null;
+  pdf.error = null;
+  if (!navigator.onLine) {
+    pdf.error = 'Necesitas conexión para generar el PDF.';
+    renderPdfSheet();
+    openSheet(sheet);
+    return;
+  }
+  pdf.busy = true;
+  pdf.started = Date.now();
+  setPdfButton(true);
+  renderPdfSheet();
+  openSheet(sheet);
+  pdf.timer = setInterval(tickPdf, 1000);
+  const pin = state.admin.pin;
+  try {
+    const res = await generatePdf(pin);
+    const url = safeURL(res.url);
+    if (!url) throw new Error('El servidor no devolvió el enlace del PDF.');
+    pdf.result = { ...res, url, download: safeURL(res.download) || url };
+    pdf.at = new Date();
+  } catch (ex) {
+    pdf.error = ex.timeout
+      ? 'El PDF tardó más de 90 segundos y dejé de esperar. Inténtalo de nuevo en un momento.'
+      : ex.network ? 'No hay conexión con el servidor. Inténtalo de nuevo.' : ex.message;
+  } finally {
+    pdf.busy = false;
+    clearInterval(pdf.timer);
+    setPdfButton(false);
+  }
+  if (!state.admin) { pdf.result = null; pdf.error = null; return; } // cerró sesión mientras tanto
+  if (sheet.open) {
+    renderPdfSheet();
+    if (pdf.result) ($('#pdfShare').hidden ? $('#pdfOpen') : $('#pdfShare')).focus();
+  } else if (pdf.result) {
+    toast('Tu catálogo PDF está listo', { duration: 12000, action: { label: 'Ver', onClick: openPdf } });
+  } else {
+    toast(pdf.error, { error: true, duration: 8000, action: { label: 'Ver', onClick: openPdf } });
+  }
+}
+
+async function copyText(text) {
+  try {
+    await navigator.clipboard.writeText(text);
+    return true;
+  } catch {
+    const ta = Object.assign(document.createElement('textarea'), { value: text, readOnly: true });
+    ta.style.cssText = 'position:fixed;opacity:0';
+    $('#pdfSheet').append(ta);
+    ta.select();
+    let ok = false;
+    try { ok = document.execCommand('copy'); } catch { /* nada */ }
+    ta.remove();
+    return ok;
+  }
+}
+
+async function copyPdfLink() {
+  if (!pdf.result) return;
+  const ok = await copyText(pdf.result.url);
+  setPdfStatus(ok ? 'Enlace copiado' : 'No se pudo copiar. Mantén presionado «Abrir PDF» para copiar el enlace.', !ok);
+}
+
+async function sharePdf() {
+  const r = pdf.result;
+  if (!r) return;
+  try {
+    await navigator.share({ title: r.name || 'Catálogo Aura', text: PDF_SHARE_TEXT, url: r.url });
+    setPdfStatus('¡Compartido!');
+  } catch (ex) {
+    if (ex && ex.name === 'AbortError') return; // la persona cerró el menú de compartir
+    const ok = await copyText(r.url);
+    setPdfStatus(ok ? 'No se pudo abrir el menú de compartir: copié el enlace para que lo pegues.' : 'No se pudo compartir. Usa «Abrir PDF».', !ok);
+  }
+}
+
 // ── Service worker y actualizaciones de la app ────────────────
 let swReg = null;
 function promptReload(worker) {
@@ -742,7 +894,12 @@ function bind() {
   $('#versionNote').textContent = `Aura Catálogo · versión ${APP_VERSION}${MOCK ? ' · modo demo (PIN 1234)' : ''}`;
 
   // Admin
-  ['#loginSheet', '#sellSheet', '#confirmSheet'].forEach((s) => wireSheet($(s)));
+  ['#loginSheet', '#sellSheet', '#confirmSheet', '#pdfSheet'].forEach((s) => wireSheet($(s)));
+  $('#pdfBtn').addEventListener('click', openPdf);
+  $('#pdfRetry').addEventListener('click', startPdf);
+  $('#pdfRegen').addEventListener('click', startPdf);
+  $('#pdfCopy').addEventListener('click', copyPdfLink);
+  $('#pdfShare').addEventListener('click', sharePdf);
   $('#lockBtn').addEventListener('click', () => {
     showFormError($('#loginError'), '');
     $('#pin').value = '';
